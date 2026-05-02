@@ -4,603 +4,729 @@
 
 Ovaj dokument evidentira poznate probleme, rizike i tehnički dug u postojećem DocCentral v6.0 rešenju.
 
-Dokument služi kao:
+Cilj dokumenta je da posluži kao osnova za:
 
-- backlog za tehnička unapređenja
-- osnova za planiranje nove enterprise verzije
-- input za Cloud Code / Claude Code razvoj
-- kontrolna lista za arhitektonske odluke
-- pregled rizika koje treba rešiti pre produkcionog proširenja
-
----
-
-## 2. Najkritičniji poznati rizik
-
-### 2.1 Rizik duplog delovodnog broja
-
-Najvažniji rizik u rešenju je mogućnost da dva korisnika istovremeno zavode dokument i potencijalno dobiju isti delovodni broj.
-
-Status:
-
-```text
-KRITIČNO
-```
-
-Poznato:
-
-- korisnici moraju moći istovremeno da zavode dokumenta
-- sistem nikada ne sme dozvoliti isti delovodni broj za dva dokumenta
-- zbog race condition problema postoji poseban flow:
-  - `CF_DocCentral21_AddWorkbookNumberToNewDocPowerApps`
-- upload dokumenta ide preko flow-a:
-  - `Upload Doc`
-
-Rizik:
-
-```text
-Ako se delovodni broj računa u Canvas aplikaciji ili na osnovu poslednjeg pročitanog broja bez atomic kontrole, postoji rizik od duplikata.
-```
-
-Obavezna korekcija:
-
-- finalna dodela delovodnog broja mora biti server-side
-- mora postojati concurrency-safe mehanizam
-- mora postojati unique constraint
-- mora postojati retry logika
-- mora postojati audit log
-- mora postojati kontrolisan response prema Canvas aplikaciji
-
-Prioritet:
-
-```text
-P0 / Critical
-```
+- procenu rizika postojeće verzije
+- planiranje enterprise unapređenja
+- pripremu nove verzije aplikacije
+- definisanje prioriteta u backlog-u
+- usmeravanje Cloud Code / Claude Code razvoja
 
 ---
 
-## 3. Tehnički dug: Canvas aplikacija
+## 2. Status informacija
 
-### 3.1 Kritična logika ne sme biti u Canvas aplikaciji
+Informacije u ovom dokumentu su razdvojene po statusu:
 
-Rizik:
-
-Canvas aplikacija nije pogodna da bude izvor istine za kritične poslovne odluke kao što je finalna dodela delovodnog broja.
-
-Pravilo:
-
-```text
-Canvas App sme da inicira proces, ali ne sme da garantuje jedinstvenost broja.
-```
-
-Preporuka:
-
-- Canvas aplikacija šalje zahtev Power Automate flow-u
-- flow validira podatke
-- flow rezerviše broj
-- flow upisuje dokument
-- flow vraća rezultat aplikaciji
-
-Prioritet:
-
-```text
-P0 / Critical
-```
+- POTVRĐENO — direktno potvrđeno kroz dostavljene podatke ili korisničko objašnjenje
+- PRETPOSTAVKA — zaključak izveden iz naziva lista, kolona, biblioteka ili procesa
+- NEPOZNATO — podatak nije dostavljen ili nije moguće potvrditi
 
 ---
 
-### 3.2 Nepoznata kompletna struktura ekrana
+## 3. Najkritičniji poznati rizik
 
-Poznato:
+## 3.1 Dupli delovodni broj kod istovremenog zavođenja
 
-- aplikacija je Canvas App
-- početni ekran je `scrHome`
-- postoji funkcionalnost za zavođenje dokumenta
+Status: POTVRĐENO
 
-Nepoznato:
+Kritičnost: P0
 
-- tačan naziv ekrana za zavođenje dokumenta
-- tačan naziv ekrana za upload
-- da li postoje komponente
-- da li postoje globalne varijable za konfiguraciju
-- da li postoji višejezičnost
-- da li postoji centralizovano rukovanje greškama
+Opis:
 
-Preporuka:
+U sistemu postoji poslovni zahtev da više korisnika može istovremeno da zavodi dokumenta, ali sistem nikada ne sme dozvoliti da dva dokumenta dobiju isti delovodni broj.
 
-- eksportovati Canvas app
-- analizirati `.msapp` / unpacked source
-- dokumentovati ekrane, kontrole, kolekcije i flow pozive
+Ovaj rizik je posebno naglašen jer se race condition problem već pojavio kada dvoje korisnika istovremeno zavode dokument.
 
-Prioritet:
-
-```text
-P1 / High
-```
-
----
-
-## 4. Tehnički dug: Power Automate
-
-### 4.1 Nepoznata unutrašnja logika flow-a za delovodni broj
-
-Poznat flow:
+Potvrđeno je da postoji poseban Power Automate flow zbog ovog problema:
 
 ```text
 CF_DocCentral21_AddWorkbookNumberToNewDocPowerApps
 ```
 
-Poznata namena:
+Zaključak:
 
-```text
-Dodela / dodavanje delovodnog broja novom dokumentu iz Power Apps aplikacije.
-```
-
-Nepoznato:
-
-- da li koristi ETag
-- da li koristi retry logiku
-- da li koristi SharePoint unique constraint
-- da li piše u `RezervisaniBrojevi`
-- da li vraća standardizovan JSON response
-- da li ima centralizovan error handling
-- da li loguje correlation ID
-- da li postoji rollback ako upload dokumenta ne uspe
+Dodela delovodnog broja je najvažniji enterprise rizik i mora biti centralni deo target arhitekture nove verzije.
 
 Rizik:
 
-```text
-Ako flow samo pročita poslednji broj i poveća ga za 1, bez atomic kontrole, problem race condition-a nije potpuno rešen.
-```
+Ako se delovodni broj generiše u Canvas aplikaciji, lokalnoj kolekciji ili prostim čitanjem poslednjeg broja iz SharePoint-a, može doći do duplikata.
 
-Preporuka:
+Posledica:
 
-- otvoriti flow
-- eksportovati definiciju flow-a
-- analizirati akcije, trigger, concurrency settings i retry policy
-- dokumentovati tačan algoritam dodele broja
+- dva dokumenta mogu dobiti isti delovodni broj
+- narušava se integritet pisarnice
+- dokumentacija postaje pravno i poslovno nepouzdana
+- audit trail može postati neupotrebljiv
+- korisnici gube poverenje u sistem
 
-Prioritet:
+Obavezna korekcija:
 
-```text
-P0 / Critical
-```
+- centralizovati dodelu delovodnog broja
+- koristiti server-side flow / service kao jedini izvor istine
+- uvesti atomic / optimistic locking
+- uvesti retry logiku
+- uvesti unique constraint
+- uvesti audit log za svaki pokušaj dodele broja
+- vratiti kontrolisan odgovor Canvas aplikaciji
 
 ---
 
-### 4.2 Nepoznata logika `Upload Doc` flow-a
+## 4. Canvas App rizici
 
-Poznat flow:
+## 4.1 Previše poslovne logike u Canvas aplikaciji
+
+Status: PRETPOSTAVKA
+
+Opis:
+
+Na osnovu dosadašnje analize Power Platform obrazaca i postojanja posebnog flow-a za dodelu delovodnog broja, postoji rizik da deo poslovne logike živi u Canvas aplikaciji.
+
+Canvas aplikacija treba da bude UI sloj, a ne glavni backend za kritične transakcije.
+
+Rizik:
+
+Ako Canvas App:
+
+- računa sledeći delovodni broj
+- oslanja se na lokalne kolekcije
+- direktno upisuje kritične podatke
+- radi finalnu validaciju bez backend potvrde
+
+onda sistem nije dovoljno bezbedan za istovremeni rad više korisnika.
+
+Preporuka:
+
+Canvas App treba da:
+
+- prikazuje formu
+- radi osnovnu UI validaciju
+- poziva Power Automate flow
+- prikazuje rezultat korisniku
+- prikazuje correlation ID kod greške
+
+Canvas App ne treba da:
+
+- samostalno dodeljuje delovodni broj
+- garantuje jedinstvenost broja
+- direktno obavlja kritične Create/Edit/Delete operacije
+- bude jedini izvor poslovnih pravila
+
+---
+
+## 4.2 Nepotpuna poznata struktura Canvas aplikacije
+
+Status: NEPOZNATO
+
+Potvrđeno je:
+
+- aplikacija je Canvas App
+- početni ekran je `scrHome`
+- postoji funkcionalnost zavođenja dokumenta
+- pregled dokumenata se ne radi kroz poseban ekran, već direktno u SharePoint listi / biblioteci
+- upload dokumenta ide preko flow-a `Upload Doc`
+
+Nepoznato je:
+
+- tačan broj ekrana
+- svi nazivi ekrana
+- nazivi glavnih kontrola
+- OnStart logika
+- App.Formulas / named formulas
+- kolekcije koje se učitavaju
+- globalne promenljive
+- lokalne promenljive
+- validaciona pravila
+- detaljna navigacija
+- error handling u aplikaciji
+- response handling za flow-ove
+
+Rizik:
+
+Bez pune analize Canvas App paketa nije moguće dati kompletan tehnički opis UI logike.
+
+Preporuka:
+
+Za sledeću fazu analize potrebno je izvesti Canvas App iz solution-a i analizirati:
+
+- `CanvasManifest.json`
+- screen fajlove
+- control tree
+- formulas
+- data sources
+- flow references
+- environment variables
+- connection references
+
+---
+
+## 5. Power Automate rizici
+
+## 5.1 Nedovoljno poznata flow arhitektura
+
+Status: NEPOZNATO
+
+Potvrđeni flow-ovi:
 
 ```text
 Upload Doc
+CF_DocCentral21_AddWorkbookNumberToNewDocPowerApps
 ```
 
-Poznata namena:
+Potvrđene funkcionalnosti:
 
-```text
-Upload dokumenta preko Power Automate flow-a.
-```
+- upload dokumenta ide preko Power Automate flow-a
+- dodela delovodnog broja ide preko posebnog flow-a zbog race condition problema
+- email dokumenti se obrađuju preko Power Automate flow-a koji čita shared mailbox i zavodi dokumente iz emailova sa attachmentom
+- export šifarnika i konfiguracije iz AppConfig-a ide preko posebne funkcionalnosti
 
 Nepoznato:
 
-- koji trigger koristi
-- koji input prima iz Canvas App
-- da li upload ide u `Shared Documents`
-- da li update-uje metapodatke posle kreiranja fajla
-- da li vraća item ID
-- da li vraća file URL
-- da li vraća greške u standardizovanom JSON formatu
-- da li ima rollback ako kasniji korak ne uspe
+- tačni nazivi svih flow-ova
+- trigger-i svih flow-ova
+- input schema
+- output schema
+- konektori
+- retry policy
+- concurrency settings
+- run after konfiguracija
+- error handling
+- logging
+- da li se koristi service account
+- da li flow-ovi vraćaju standardizovan response
+- da li postoji centralizovan audit log
 
 Rizik:
 
-```text
-Ako upload i dodela broja nisu transakcijski povezani, može nastati dokument bez ispravnog statusa ili broj bez dokumenta.
-```
+Bez standardizovane flow arhitekture može doći do:
+
+- nedoslednih grešaka
+- nepouzdanog response-a prema Canvas App
+- teškoća u debugovanju
+- timeout problema
+- dupliranja logike
+- nejasne odgovornosti između Canvas App i flow-ova
 
 Preporuka:
 
-- uvesti correlation ID
-- povezati upload i rezervaciju broja kroz isti proces ili jasan orchestration flow
-- dodati status obrade
-- dodati audit zapis
+Za svaki flow napraviti tehnički dokument sa:
 
-Prioritet:
-
-```text
-P1 / High
-```
+- nazivom
+- trigger-om
+- ulazima
+- izlazima
+- konektorima
+- SharePoint zavisnostima
+- glavnim koracima
+- concurrency podešavanjima
+- retry podešavanjima
+- error handling-om
+- audit logging-om
+- poznatim problemima
 
 ---
 
-### 4.3 Nepoznat email intake flow
+## 5.2 Race condition u procesu dodele broja
 
-Poznato:
+Status: POTVRĐENO
+
+Opis:
+
+Korisnik je eksplicitno naveo da postoji poseban flow zbog race condition problema kada dvoje korisnika istovremeno zavode dokument.
+
+Flow:
 
 ```text
-Posebna funkcionalnost čita shared mailbox i zavodi dokumente iz mailova sa attachment-om.
+CF_DocCentral21_AddWorkbookNumberToNewDocPowerApps
 ```
-
-Nepoznato:
-
-- naziv flow-a
-- mailbox adresa
-- da li obrađuje samo attachment-e ili i telo maila
-- da li sprečava duplu obradu istog emaila
-- da li čuva Message ID
-- da li čuva pošiljaoca
-- da li odmah zavodi dokument ili ga stavlja u staging
-- da li koristi istu logiku delovodnog broja kao Canvas App
 
 Rizik:
 
-```text
-Email intake može proizvesti duplikate ako nema Message ID / Attachment Hash / Processing Status kontrolu.
-```
+Ako flow ne koristi dovoljno čvrst atomic / optimistic locking mehanizam, race condition se može ponoviti.
+
+Posebno rizični obrasci:
+
+- Get items -> Max number -> Create item
+- čitanje poslednjeg broja bez unique constraint-a
+- paralelno izvršavanje bez kontrole konkurentnosti
+- retry bez provere stvarnog konflikta
+- upis broja u više mesta bez transakcione kontrole
 
 Preporuka:
 
-- dodati `EmailMessageId`
-- dodati `AttachmentHash`
-- dodati `ProcessingStatus`
-- dodati retry i dead-letter logiku
-- koristiti isti server-side numbering servis kao Canvas App
-
-Prioritet:
-
-```text
-P1 / High
-```
+U target arhitekturi proces dodele broja mora biti izolovan i tretiran kao poseban numbering service.
 
 ---
 
-### 4.4 Nepoznat export flow
+## 5.3 Mogući timeout kod dugih flow-ova
 
-Poznato:
+Status: PRETPOSTAVKA
 
-```text
-Export šifarnika i konfiguracije iz AppConfig liste.
-```
+Opis:
+
+Power Automate flow-ovi koji se pozivaju iz Canvas aplikacije mogu praviti problem ako predugo traju pre nego što vrate odgovor aplikaciji.
+
+Rizik:
+
+- Canvas App može dobiti timeout
+- korisnik ne zna da li je dokument uspešno zaveden
+- može doći do ponovnog slanja istog zahteva
+- ponovni zahtev može izazvati duple pokušaje upisa
+
+Preporuka:
+
+Kritični flow-ovi treba da:
+
+- brzo vrate kontrolisan odgovor kada je moguće
+- imaju correlation ID
+- upisuju status u audit log
+- spreče dupli submit
+- imaju idempotency key za kritične operacije
+
+---
+
+## 6. SharePoint data model rizici
+
+## 6.1 Nedovoljno indeksirana polja
+
+Status: PRETPOSTAVKA
+
+Opis:
+
+U dostavljenim XML metadata odgovorima za više relevantnih polja vidi se da `Indexed` nije uključen.
+
+Primeri važnih polja koja treba razmotriti za indeksiranje:
+
+- `DelovodniBroj`
+- `EdokumentID`
+- `Edokument`
+- `Attachment`
+- `RezervisaniBroj`
+- `DatumRezervacije`
+- `Title` u pojedinim listama
+- statusna i lookup polja koja se koriste u filterima
+
+Rizik:
+
+Ako liste i biblioteke rastu, neindeksirana polja mogu izazvati:
+
+- spore upite
+- probleme sa delegacijom
+- SharePoint list view threshold probleme
+- sporije flow izvršavanje
+- sporiji prikaz u SharePoint listama
+
+Preporuka:
+
+Napraviti poseban indexing plan za sve liste i biblioteke.
+
+---
+
+## 6.2 Unique constraint nije potvrđen za kritična polja
+
+Status: NEPOZNATO
+
+Opis:
+
+Za kritični zahtev jedinstvenog delovodnog broja mora postojati jedinstvena kontrola.
+
+Nepoznato je da li je unique constraint uključen na:
+
+- finalnom polju `DelovodniBroj`
+- polju `RezervisaniBroj`
+- kombinaciji godina + broj
+- kombinaciji tip dokumenta + godina + broj
+
+Rizik:
+
+Bez unique constraint-a, aplikaciona logika može pogrešiti i dozvoliti duplikat.
+
+Preporuka:
+
+U novoj verziji obavezno definisati jedinstvenost na nivou data modela.
+
+Minimalno:
+
+- finalni `DelovodniBroj` mora biti unique
+- rezervisani broj mora biti unique u okviru relevantnog scope-a
+- scope mora biti jasno definisan: godina, tip dokumenta, organizaciona jedinica ili globalno
+
+---
+
+## 6.3 SharePoint kao transakcioni sistem
+
+Status: PRETPOSTAVKA
+
+Opis:
+
+SharePoint Online se koristi kao primarni data layer i storage layer.
+
+Rizik:
+
+SharePoint nije klasična relaciona transakciona baza.
+
+Kod enterprise pisarnice treba posebno voditi računa o:
+
+- konkurentnom upisu
+- list view threshold-u
+- throttling-u
+- audit-u
+- jedinstvenosti brojeva
+- permissions modelu
+- delegaciji
+- performance-u
+- retry logici
+
+Preporuka:
+
+Zadržati SharePoint ako je to poslovno i licencno poželjno, ali kritične procese dizajnirati sa jasnim ograničenjima SharePoint-a.
+
+---
+
+## 7. AppConfig rizici
+
+## 7.1 AppConfig kao centralna konfiguracija
+
+Status: POTVRĐENO DELIMIČNO
+
+Potvrđeno:
+
+Lista `AppConfig` postoji i sadrži polja:
+
+- `Title`
+- `Config`
+- `ColumnHeader`
+
+Korisnik je potvrdio da se svi šifarnici i config JSON nalaze u `AppConfig` listi.
 
 Nepoznato:
 
-- naziv flow-a
-- format exporta
-- da li exportuje JSON
-- da li validira JSON pre exporta
-- da li upisuje u `Exports`
-- da li beleži verziju konfiguracije
-- da li postoji audit
+- tačan JSON format
+- broj konfiguracionih zapisa
+- struktura šifarnika
+- da li postoji verzionisanje konfiguracije
+- da li postoji validacija JSON-a
+- da li postoji export/import mehanizam sa kontrolom verzije
+- da li postoji rollback konfiguracije
+
+Rizik:
+
+Ako AppConfig nema strogu strukturu i validaciju:
+
+- pogrešan JSON može srušiti deo aplikacije
+- promene konfiguracije mogu uticati na produkciju bez kontrole
+- nema jasnog rollback-a
+- nema audit-a nad promenama šifarnika
 
 Preporuka:
 
-- standardizovati export format
-- dodati `ConfigVersion`
-- dodati `ExportType`
-- dodati `ExportedAt`
-- dodati `ExportedByEmail`
-- dodati `CorrelationId`
+Uvesti:
 
-Prioritet:
-
-```text
-P2 / Medium
-```
+- JSON schema po tipu konfiguracije
+- version polje
+- active/inactive status
+- changed by / changed at
+- config export
+- config validation flow
+- backup pre izmene
+- audit log za izmene
 
 ---
 
-## 5. Tehnički dug: SharePoint data model
+## 8. Email intake rizici
 
-### 5.1 `RezervisaniBrojevi` nema potvrđen unique constraint
+## 8.1 Obrada email dokumenata iz shared mailbox-a
+
+Status: POTVRĐENO DELIMIČNO
+
+Korisnik je potvrdio:
+
+Email dokumenti su posebna funkcionalnost gde Power Automate čita shared mailbox i zavodi dokumente iz emailova sa attachmentom.
+
+Biblioteka:
+
+```text
+EmailDocuments
+```
 
 Poznata polja:
 
+- `FileLeafRef`
 - `Title`
-- `RezervisaniBroj`
-- `DatumRezervacije`
+- `_ExtendedDescription`
+- `PosiljalacEmail`
+- `Posiljalac`
+- `MediaServiceImageTags`
+- `ContentType`
 
 Nepoznato:
 
-- da li postoji unique constraint
-- da li je `Title` jedinstven
-- da li postoji složeni ključ po godini / tipu dokumenta / broju
-- da li se čuva status rezervacije
-- da li se čuva korisnik koji je rezervisao broj
+- naziv flow-a
+- shared mailbox adresa
+- trigger
+- da li se obrađuju samo emailovi sa attachmentom
+- kako se sprečava dupli import istog emaila
+- da li se koristi MessageId
+- kako se čuva status obrade
+- kako se obrađuju greške
+- gde se loguju greške
+- da li se čuva originalni email metadata
 
 Rizik:
 
-```text
-SharePoint Number polje samo po sebi ne garantuje jedinstvenost poslovnog broja u svim scenarijima.
-```
+Bez idempotency kontrole, isti email ili attachment može biti obrađen više puta.
 
 Preporuka:
 
-Dodati tekstualni unique key:
+Za email intake uvesti:
 
-```text
-UniqueReservationKey
-```
-
-Primer:
-
-```text
-2026|OS|123
-```
-
-Na tom polju uključiti unique constraint.
-
-Prioritet:
-
-```text
-P0 / Critical
-```
+- `InternetMessageId` ili Graph message ID
+- hash attachmenta po potrebi
+- status obrade
+- processed timestamp
+- error log
+- retry policy
+- dead-letter logiku za neuspešne emailove
 
 ---
 
-### 5.2 `Shared Documents` nema potvrđen unique constraint na `DelovodniBroj`
+## 9. Export rizici
 
-Poznato:
+## 9.1 Export šifarnika i konfiguracije
 
-- biblioteka ima polje `DelovodniBroj`
-- tip polja je `Single line of text`
+Status: POTVRĐENO DELIMIČNO
+
+Korisnik je potvrdio:
+
+Export se odnosi na šifarnike i konfiguracije iz `AppConfig`.
+
+Biblioteka:
+
+```text
+Exports
+```
 
 Nepoznato:
 
-- da li je `DelovodniBroj` indeksiran
-- da li ima unique constraint
-- da li se koristi kao finalni poslovni ključ
-- da li se popunjava pre ili posle upload-a
+- format exporta
+- naziv flow-a
+- da li export ide u Excel, JSON, CSV ili drugi format
+- da li se export verzioniše
+- da li se export koristi za backup
+- da li postoji import nazad u sistem
+- da li postoji kontrola pristupa export fajlovima
 
 Rizik:
 
-```text
-Ako `DelovodniBroj` nije unique, biblioteka može prihvatiti dva dokumenta sa istim poslovnim brojem.
-```
+Ako export sadrži konfiguraciju sistema, treba kontrolisati ko može da ga generiše i preuzima.
 
 Preporuka:
 
-- indeksirati `DelovodniBroj`
-- uključiti unique constraint ako poslovna pravila dozvoljavaju
-- uskladiti sa `RezervisaniBrojevi`
-- uvesti kontrolni audit između rezervacije i dokumenta
+Uvesti:
 
-Prioritet:
-
-```text
-P0 / Critical
-```
+- naziv export fajla sa datumom i verzijom
+- audit za svaki export
+- kontrolu pristupa
+- čuvanje source config verzije
+- optional checksum / hash fajla
 
 ---
 
-### 5.3 AppConfig sadrži konfiguraciju, ali sadržaj nije analiziran
+## 10. Security i permissions rizici
 
-Poznato:
+## 10.1 Direktan pristup SharePoint-u
 
-- `AppConfig` ima polje `Config`
-- `Config` je Multiple lines of text
-- `ColumnHeader` je Multiple lines of text
-- lista služi za šifarnike i konfiguracije
+Status: PRETPOSTAVKA
 
-Nepoznato:
+Opis:
 
-- struktura JSON-a
-- verzionisanje konfiguracije
-- validacija JSON-a
-- da li postoje aktivne/neaktivne konfiguracije
-- da li postoje konfiguracije po okruženju
+Pregled dokumenata se radi direktno kroz SharePoint listu / biblioteku.
 
 Rizik:
 
-```text
-Bez validacije i verzionisanja, greška u JSON konfiguraciji može oboriti deo aplikacije.
-```
+Ako korisnici imaju šira SharePoint prava nego što je potrebno, mogu direktno menjati podatke mimo Canvas App i Power Automate kontrole.
 
 Preporuka:
 
-- definisati JSON schema
-- dodati `ConfigVersion`
-- dodati `IsActive`
-- dodati `Environment`
-- dodati export/import proceduru
-- dodati validaciju pre snimanja
+Ciljni model:
 
-Prioritet:
-
-```text
-P1 / High
-```
+- korisnici imaju Read Only nad kritičnim listama i bibliotekama
+- Create/Edit/Delete ide preko Power Automate flow-ova
+- flow-ovi rade kroz service account
+- kritične liste imaju ograničene dozvole
+- administratorske funkcije su vezane za Entra ID grupe
 
 ---
 
-## 6. Tehnički dug: Security
+## 10.2 Audit nije potvrđen
 
-### 6.1 Nije potvrđen permission model
+Status: NEPOZNATO
 
-Preporučeni model:
+Nepoznato je da li postoji centralizovan audit log za:
 
-```text
-Korisnici imaju read-only pristup SharePoint-u, a upise izvršavaju Power Automate flow-ovi preko service account-a.
-```
-
-Nepoznato:
-
-- da li je ovaj model već primenjen
-- koji service account se koristi
-- ko ima edit prava nad listama
-- ko ima pristup AppConfig listi
-- ko može ručno menjati `RezervisaniBrojevi`
-- ko može brisati dokumente
+- zavođenje dokumenta
+- dodelu delovodnog broja
+- upload dokumenta
+- email intake
+- export konfiguracije
+- greške flow-ova
+- izmene AppConfig-a
 
 Rizik:
 
-```text
-Ako korisnici mogu direktno menjati SharePoint podatke, mogu zaobići poslovnu logiku iz Power Automate flow-ova.
-```
+Bez audit loga je teško dokazati:
+
+- ko je šta uradio
+- kada je broj dodeljen
+- zašto je došlo do greške
+- da li je retry uspeo
+- da li je dokument uploadovan
+- koji flow run je obradio zahtev
 
 Preporuka:
 
-- uvesti read-only za standardne korisnike
-- ograničiti edit prava na service account
-- zaštititi `AppConfig`
-- zaštititi `RezervisaniBrojevi`
-- uvesti posebne admin role
-
-Prioritet:
+Uvesti centralnu listu:
 
 ```text
-P1 / High
+AuditLog
 ```
+
+Minimalna polja:
+
+- Title
+- CorrelationId
+- FlowName
+- Action
+- Status
+- UserEmail
+- StartedAt
+- FinishedAt
+- DurationMs
+- DelovodniBroj
+- DocumentItemId
+- DocumentUrl
+- ErrorCode
+- ErrorMessage
+- RetryCount
+- RawPayload
 
 ---
 
-### 6.2 Nije potvrđen audit model
+## 11. ALM i deployment rizici
+
+## 11.1 Nepoznat ALM model
+
+Status: NEPOZNATO
 
 Nepoznato:
 
-- da li postoji audit lista
-- da li se loguju flow run ID-jevi
-- da li se loguje stvarni korisnik
-- da li se loguje request/response
-- da li se loguju greške
-
-Rizik:
-
-```text
-Bez audit loga nije moguće pouzdano rekonstruisati ko je, kada i zašto dobio određeni delovodni broj.
-```
-
-Preporuka:
-
-- kreirati `FlowExecutionLog`
-- dodati `CorrelationId`
-- logovati sve kritične akcije
-- logovati uspešne i neuspešne rezervacije broja
-
-Prioritet:
-
-```text
-P1 / High
-```
-
----
-
-## 7. Tehnički dug: Operativni rad
-
-### 7.1 Nejasan Dev/Test/Prod proces
-
-Nepoznato:
-
-- da li postoje odvojena okruženja
-- da li postoje različiti SharePoint site-ovi
-- da li postoji ALM proces
+- da li postoji Dev/Test/Prod environment
 - da li se koristi managed solution
+- da li se koristi connection references
 - da li se koriste environment variables
-- da li se connection references pravilno mapiraju
+- da li postoji deployment pipeline
+- da li postoji GitHub repo za source dokumentaciju i artefakte
+- da li se solution exportuje redovno
 
 Rizik:
 
-```text
-Bez ALM procesa, promene u produkciji mogu biti ručne, teško proverljive i rizične.
-```
+Bez ALM procesa:
+
+- promene mogu biti ručne i teško ponovljive
+- deployment može zavisiti od jednog korisnika
+- konekcije mogu pucati pri importu
+- teško je vratiti prethodnu verziju
 
 Preporuka:
 
-- definisati Dev/Test/Prod
-- koristiti solution packaging
-- dokumentovati connection references
-- koristiti environment variables
-- uvesti release checklist
+Uvesti ALM minimum:
 
-Prioritet:
-
-```text
-P2 / Medium
-```
-
----
-
-### 7.2 Nije poznat monitoring
-
-Nepoznato:
-
-- da li se prati neuspeh flow-ova
-- da li postoje email notifikacije za greške
-- da li postoji dashboard grešaka
-- da li postoji log za retry
-- da li postoji vlasnik procesa
-
-Preporuka:
-
-- definisati monitoring flow-ova
-- dodati dnevni pregled neuspešnih procesa
-- dodati admin ekran `scrLogs`
-- dodati alert za kritične greške u dodeli broja
-
-Prioritet:
-
-```text
-P2 / Medium
-```
+- Dev environment
+- Test/UAT environment
+- Prod environment
+- solution versioning
+- connection references
+- environment variables
+- deployment checklist
+- export solution backup
+- GitHub dokumentacija
+- release notes
 
 ---
 
-## 8. Prioritetni backlog
+## 12. Prioriteti za rešavanje
 
-### P0 / Critical
+## P0 — Kritično
 
-| ID | Stavka | Razlog |
-|---|---|---|
-| P0-001 | Concurrency-safe dodela delovodnog broja | Sprečavanje duplih brojeva |
-| P0-002 | Unique key u `RezervisaniBrojevi` | Tehnička zaštita od duplikata |
-| P0-003 | Unique / kontrola `DelovodniBroj` u `Shared Documents` | Finalna zaštita poslovnog ključa |
-| P0-004 | Analiza flow-a `CF_DocCentral21_AddWorkbookNumberToNewDocPowerApps` | Potvrda algoritma |
-| P0-005 | Standardizovan error response za zavođenje | Pouzdan UX i dijagnostika |
+- concurrency-safe dodela delovodnog broja
+- unique constraint za finalni delovodni broj
+- retry i controlled error response
+- audit log za numbering flow
+- sprečavanje duplog submit-a iz Canvas App
 
----
+## P1 — Visok prioritet
 
-### P1 / High
+- standardizacija Power Automate response formata
+- audit log za upload, email intake i export
+- security model sa Read Only SharePoint pristupom za korisnike
+- AppConfig schema i validacija
+- indeksiranje ključnih SharePoint kolona
 
-| ID | Stavka | Razlog |
-|---|---|---|
-| P1-001 | Audit log za sve kritične akcije | Praćenje i kontrola |
-| P1-002 | Analiza `Upload Doc` flow-a | Stabilnost upload procesa |
-| P1-003 | Analiza email intake procesa | Sprečavanje duplikata iz emaila |
-| P1-004 | JSON schema za `AppConfig` | Stabilnost konfiguracije |
-| P1-005 | Security model sa read-only korisnicima | Kontrola direktnih izmena |
-| P1-006 | Dokumentovanje Canvas app ekrana | Razumevanje aplikacije |
+## P2 — Srednji prioritet
 
----
+- kompletna dokumentacija svih flow-ova
+- kompletna analiza Canvas App ekrana i formula
+- export/import konfiguracije
+- environment variables
+- deployment checklist
 
-### P2 / Medium
+## P3 — Niži prioritet
 
-| ID | Stavka | Razlog |
-|---|---|---|
-| P2-001 | ALM dokumentacija | Stabilan release proces |
-| P2-002 | Dev/Test/Prod razdvajanje | Kontrola promena |
-| P2-003 | Monitoring flow-ova | Operativna stabilnost |
-| P2-004 | Export verzionisanje | Kontrola konfiguracija |
-| P2-005 | Admin ekran za logove | Lakša podrška |
+- UI polish
+- dodatni dashboard
+- napredna reporting funkcionalnost
+- dodatna lokalizacija
+- prošireni admin panel
 
 ---
 
-## 9. Zaključak
+## 13. Otvorene stavke za potvrdu
 
-Najveći tehnički dug i najveći poslovni rizik DocCentral rešenja odnosi se na dodelu delovodnog broja u uslovima istovremenog rada više korisnika.
+Potrebno je potvrditi:
 
-Zato nova verzija mora prvo rešiti:
+1. Da li `DelovodniBroj` u glavnoj listi / biblioteci ima unique constraint?
+2. Da li `RezervisaniBroj` ima unique constraint?
+3. Koji je tačan scope delovodnog broja: globalno, po godini, po tipu dokumenta ili po organizacionoj jedinici?
+4. Koji flow finalno upisuje dokument u glavnu evidenciju?
+5. Koji flow finalno upisuje dokument u `Shared Documents`?
+6. Koji flow obrađuje shared mailbox?
+7. Koji flow radi export konfiguracije?
+8. Da li postoji centralni audit log?
+9. Da li postoji service account?
+10. Koja prava imaju obični korisnici nad SharePoint listama i bibliotekama?
+11. Da li se AppConfig menja ručno ili kroz administrativni ekran?
+12. Da li postoji Dev/Test/Prod okruženje?
+13. Da li se koristi managed solution?
+14. Da li postoje environment variables?
+15. Da li postoje connection references u solution-u?
 
-```text
-Concurrency-safe numbering
-```
+---
 
-Tek nakon toga treba širiti funkcionalnosti, UI i dodatne procese.
+## 14. Zaključak
 
-Prioritet razvoja:
+Najveći poznati tehnički rizik u postojećem DocCentral v6.0 rešenju je dodela jedinstvenog delovodnog broja u situaciji kada više korisnika istovremeno zavodi dokumente.
 
-1. sigurna dodela delovodnog broja
-2. audit i logging
-3. stabilan upload
-4. sigurnosni model
-5. email intake stabilizacija
-6. AppConfig validacija
-7. ALM i monitoring
+To mora biti rešeno kao enterprise backend proces, ne kao UI logika.
+
+Nova verzija mora imati:
+
+- centralizovan numbering service
+- concurrency-safe rezervaciju broja
+- unique constraint
+- retry logiku
+- audit log
+- standardizovan response
+- jasan security model
+- bolju dokumentovanost flow-ova
+- validiran AppConfig model
+- ALM proces
