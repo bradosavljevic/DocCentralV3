@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_GenerateRegistryNumber_TriggerInput",
+  "title": "CF_DocCentralV3_GenerateRegistryNumber — Power Apps V2 Trigger Input Schema",
+  "description": "Input parameters for the CF_DocCentralV3_GenerateRegistryNumber child flow. Called by CF_DocCentralV3_CreateDocument to atomically increment the registry counter and return the formatted delovodni broj.",
+  "type": "object",
+  "required": [
+    "initiatorEmail"
+  ],
+  "properties": {
+    "initiatorEmail": {
+      "type": "string",
+      "description": "Email address of the user who initiated the document creation. Written to AuditLog for the GenerateRegistryNumber event. Must be non-empty.",
+      "examples": ["korisnik@organizacija.rs"]
+    },
+    "correlationId": {
+      "type": "string",
+      "description": "Correlation ID to link this log entry to the parent flow run (CF_DocCentralV3_CreateDocument). If empty or omitted, the flow generates a new GUID. Pass the parent flow's correlationId for end-to-end log tracing.",
+      "default": "",
+      "examples": ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+    }
+  },
+  "examples": [
+    {
+      "initiatorEmail": "korisnik@organizacija.rs",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    },
+    {
+      "initiatorEmail": "korisnik@organizacija.rs",
+      "correlationId": ""
+    }
+  ],
+  "callerNotes": {
+    "calledBy": "CF_DocCentralV3_CreateDocument",
+    "triggerType": "Power Apps (V2) — child flow",
+    "howToCall": "Use the 'Run a Child Flow' action in the parent flow. Select CF_DocCentralV3_GenerateRegistryNumber as the child flow.",
+    "passingCorrelationId": "Always pass the parent flow's varCorrelationId so that all audit log entries for the same document creation share the same correlationId.",
+    "onFailure": "If this flow returns success=false, CF_DocCentralV3_CreateDocument must stop and return its own failure response. Do not create the document item in Svi predmeti without a valid delovodni broj."
+  }
+}

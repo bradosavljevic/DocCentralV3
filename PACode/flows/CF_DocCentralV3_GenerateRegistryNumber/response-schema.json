@@ -1,0 +1,180 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_GenerateRegistryNumber_Response",
+  "title": "CF_DocCentralV3_GenerateRegistryNumber — Response Schema",
+  "description": "Output returned by CF_DocCentralV3_GenerateRegistryNumber to CF_DocCentralV3_CreateDocument. The flow always returns a structured response — it never throws an unhandled exception to the caller.",
+
+  "oneOf": [
+    {
+      "title": "Success response",
+      "description": "Returned when the registry counter was atomically incremented and the delovodni broj was generated without duplicates.",
+      "type": "object",
+      "required": ["success", "delovodniBroj", "counterValue", "activeYear", "correlationId"],
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "const": true
+        },
+        "delovodniBroj": {
+          "type": "string",
+          "description": "The formatted registry number, e.g. '42/2026'. Format determined by App Config format string."
+        },
+        "counterValue": {
+          "type": "integer",
+          "description": "The numeric counter value that was written to App Config. Same number used in delovodniBroj.",
+          "minimum": 1
+        },
+        "activeYear": {
+          "type": "integer",
+          "description": "The active registry year read from App Config. Used in delovodniBroj formatting.",
+          "minimum": 2000
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Correlation ID used for this operation's audit log entries."
+        },
+        "message": {
+          "type": "string",
+          "description": "Empty on success.",
+          "default": ""
+        },
+        "errorCode": {
+          "type": "string",
+          "description": "Empty on success.",
+          "default": ""
+        }
+      }
+    },
+    {
+      "title": "Failure response",
+      "description": "Returned when registry number generation failed (max retries, no registry book found, duplicate detected, or unexpected error). CF_DocCentralV3_CreateDocument must stop and not create the document item.",
+      "type": "object",
+      "required": ["success", "message", "errorCode", "correlationId"],
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "const": false
+        },
+        "delovodniBroj": {
+          "type": "string",
+          "description": "Always empty string on failure.",
+          "const": ""
+        },
+        "counterValue": {
+          "type": "integer",
+          "description": "Always 0 on failure.",
+          "const": 0
+        },
+        "activeYear": {
+          "type": "integer",
+          "description": "Always 0 on failure.",
+          "const": 0
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Correlation ID, if resolved before the failure."
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable failure reason.",
+          "enum": [
+            "Registry number generation failed.",
+            "Registry book not found in App Config.",
+            "Max retries exceeded — ETag conflict not resolved.",
+            "Duplicate registry number detected."
+          ]
+        },
+        "errorCode": {
+          "type": "string",
+          "description": "Machine-readable error code.",
+          "enum": [
+            "REGISTRY_NUMBER_GENERATION_FAILED",
+            "REGISTRY_BOOK_NOT_FOUND",
+            "REGISTRY_NUMBER_DUPLICATE"
+          ]
+        }
+      }
+    }
+  ],
+
+  "examples": [
+    {
+      "success": true,
+      "delovodniBroj": "42/2026",
+      "counterValue": 42,
+      "activeYear": 2026,
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "message": "",
+      "errorCode": ""
+    },
+    {
+      "success": false,
+      "delovodniBroj": "",
+      "counterValue": 0,
+      "activeYear": 0,
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "message": "Max retries exceeded — ETag conflict not resolved.",
+      "errorCode": "REGISTRY_NUMBER_GENERATION_FAILED"
+    },
+    {
+      "success": false,
+      "delovodniBroj": "",
+      "counterValue": 0,
+      "activeYear": 0,
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "message": "Registry book not found in App Config.",
+      "errorCode": "REGISTRY_BOOK_NOT_FOUND"
+    }
+  ],
+
+  "callerGuidance": {
+    "description": "How CF_DocCentralV3_CreateDocument must handle this response.",
+    "rules": [
+      "If success = false, immediately stop and return failure to the Canvas App. Do NOT create a Svi predmeti item without a valid delovodni broj.",
+      "If success = true, use delovodniBroj as the DelovodniBroj field value when creating the Svi predmeti item.",
+      "Store counterValue and activeYear if needed for subsequent operations or logging.",
+      "Never retry this flow from the caller — retry logic is handled internally by the Do-Until loop."
+    ]
+  },
+
+  "powerAutomateOutputDefinition": {
+    "description": "Output parameters to define in the Respond to a PowerApp or flow action.",
+    "outputs": [
+      {
+        "name": "success",
+        "type": "boolean",
+        "description": "True if registry number was generated, false on any failure."
+      },
+      {
+        "name": "delovodniBroj",
+        "type": "string",
+        "description": "Formatted registry number. Empty string on failure."
+      },
+      {
+        "name": "counterValue",
+        "type": "integer",
+        "description": "Numeric counter written to App Config. 0 on failure."
+      },
+      {
+        "name": "activeYear",
+        "type": "integer",
+        "description": "Active registry year from App Config. 0 on failure."
+      },
+      {
+        "name": "correlationId",
+        "type": "string",
+        "description": "Correlation ID for audit log tracing."
+      },
+      {
+        "name": "message",
+        "type": "string",
+        "description": "Failure reason. Empty on success."
+      },
+      {
+        "name": "errorCode",
+        "type": "string",
+        "description": "Machine-readable error code. Empty on success."
+      }
+    ]
+  }
+}
