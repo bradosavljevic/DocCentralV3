@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_ArchiveDocument_TriggerInput",
+  "title": "CF_DocCentralV3_ArchiveDocument — Trigger Input Schema",
+  "description": "Inputs passed from the Canvas App to the ArchiveDocument flow via Power Apps V2 trigger.",
+  "type": "object",
+  "required": ["documentsJson", "initiatorEmail"],
+  "properties": {
+    "documentsJson": {
+      "type": "string",
+      "description": "JSON-serialized array of documents to archive. The Canvas App serializes with JSON() before calling the flow. Passed as Text because Power Apps V2 trigger does not support native Array type.",
+      "powerAppsV2Type": "Text",
+      "internalReference": "triggerBody()?['text_documentsJson']",
+      "parsedSchema": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["documentItemId", "delovodniBroj", "arhivskiZnak"],
+          "properties": {
+            "documentItemId": {
+              "type": "integer",
+              "description": "Svi predmeti item ID."
+            },
+            "delovodniBroj": {
+              "type": "string",
+              "description": "Human-readable registry number — used in log messages and failure entries. Not used for lookups."
+            },
+            "arhivskiZnak": {
+              "type": "string",
+              "description": "Archive classification code — validated against App Config allowed values."
+            }
+          }
+        }
+      },
+      "examples": [
+        "[{\"documentItemId\":42,\"delovodniBroj\":\"5/2026\",\"arhivskiZnak\":\"1.1\"}]",
+        "[{\"documentItemId\":42,\"delovodniBroj\":\"5/2026\",\"arhivskiZnak\":\"1.1\"},{\"documentItemId\":43,\"delovodniBroj\":\"6/2026\",\"arhivskiZnak\":\"2.3\"}]"
+      ]
+    },
+    "initiatorEmail": {
+      "type": "string",
+      "format": "email",
+      "description": "Email of the user performing the archiving. Written to the Arhivirao field on each archived document. Must be the logged-in user's email — validated by Canvas App, not re-validated by the flow.",
+      "powerAppsV2Type": "Text",
+      "internalReference": "triggerBody()?['text_initiatorEmail']"
+    },
+    "correlationId": {
+      "type": "string",
+      "description": "Optional correlation ID for log tracing. If empty or omitted, the flow generates a GUID.",
+      "powerAppsV2Type": "Text",
+      "internalReference": "triggerBody()?['text_correlationId']"
+    }
+  },
+  "callerNotes": {
+    "serialization": "Canvas App must call JSON(documentsCollection) to serialize the documents array before passing to the flow.",
+    "batchSize": "Recommended maximum 50 documents per call (UNKNOWN — confirm with client). Larger batches increase run duration and risk timeout.",
+    "archiveSignSource": "The Canvas App should populate the arhivskiZnak field from the App Config archive signs list for UX validation. The flow re-validates authoritatively.",
+    "statusFilter": "The Canvas App archive screen should show only documents with Stanje = Zavedeno. Documents in other states will fail per-document validation."
+  },
+  "canvasAppCall": {
+    "pattern": "CF_DocCentralV3_ArchiveDocument.Run(JSON(colSelectedDocs), User().Email, GUID())",
+    "note": "colSelectedDocs is a collection with columns documentItemId (number), delovodniBroj (text), arhivskiZnak (text)."
+  }
+}

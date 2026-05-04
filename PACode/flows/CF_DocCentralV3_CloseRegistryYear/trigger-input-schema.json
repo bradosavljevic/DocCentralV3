@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_CloseRegistryYear_TriggerInput",
+  "title": "CF_DocCentralV3_CloseRegistryYear — Trigger Input Schema",
+  "description": "Inputs passed from the Canvas App to the CloseRegistryYear flow via Power Apps V2 trigger. This is an irreversible operation.",
+  "type": "object",
+  "required": ["yearToClose", "initiatorEmail"],
+  "properties": {
+    "yearToClose": {
+      "type": "integer",
+      "description": "The year to close. Must match the currently active year in App Config. The flow re-validates this — the Canvas App value is not trusted alone.",
+      "powerAppsV2Type": "Number",
+      "internalReference": "triggerBody()?['decimal_yearToClose']",
+      "parsedAs": "int(triggerBody()?['decimal_yearToClose'])",
+      "example": 2026
+    },
+    "initiatorEmail": {
+      "type": "string",
+      "format": "email",
+      "description": "Email of the user performing the year closing. Written to ClosedBy in App Config.",
+      "powerAppsV2Type": "Text",
+      "internalReference": "triggerBody()?['text_initiatorEmail']"
+    },
+    "correlationId": {
+      "type": "string",
+      "description": "Optional correlation ID for log tracing. If empty or omitted, the flow generates a GUID.",
+      "powerAppsV2Type": "Text",
+      "internalReference": "triggerBody()?['text_correlationId']"
+    }
+  },
+  "irreversibilityNote": "This operation cannot be undone. The year-closed flag is set permanently. No flow or admin action can reopen a closed year. The Canvas App must present a confirmation step before calling this flow.",
+  "callerNotes": {
+    "preValidation": "The Canvas App year-closing screen should show the user: count of non-archived documents and count of reserved numbers. These are informational — the flow re-validates authoritatively before executing.",
+    "yearSource": "The Canvas App should read the active year from App Config and pre-populate the yearToClose field. The user should confirm the displayed year before submitting.",
+    "authorization": "The Canvas App is responsible for restricting access to this screen to admin users only. The flow does not perform role-based authorization checks.",
+    "concurrency": "Only one user should be able to submit year closing at a time. The Canvas App should disable the submit button after first click to prevent double-submission. The ETag-based If-Match on the App Config item provides a final safety net."
+  },
+  "canvasAppCall": {
+    "pattern": "CF_DocCentralV3_CloseRegistryYear.Run(varActiveYear, User().Email, GUID())",
+    "note": "varActiveYear is an integer variable set from App Config. The Canvas App shows the year for confirmation before calling."
+  }
+}

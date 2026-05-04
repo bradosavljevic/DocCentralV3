@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_CloseRegistryYear_Response",
+  "title": "CF_DocCentralV3_CloseRegistryYear — Response Schema",
+  "description": "Output returned to the Canvas App after the year closing attempt. Includes the specific precondition that failed so the Canvas App can display an actionable message.",
+  "oneOf": [
+    {
+      "title": "Success response",
+      "type": "object",
+      "required": ["success", "message", "closedYear", "newActiveYear", "correlationId"],
+      "properties": {
+        "success": { "type": "boolean", "const": true },
+        "message": { "type": "string", "const": "Godina je uspešno zaključena. Nova delovodna knjiga je kreirana za narednu godinu." },
+        "closedYear": { "type": "integer", "description": "The year that was closed." },
+        "newActiveYear": { "type": "integer", "description": "The new active year (closedYear + 1)." },
+        "correlationId": { "type": "string" },
+        "errorCode": { "type": "string", "const": "" },
+        "failedPrecondition": { "type": "string", "const": "" }
+      }
+    },
+    {
+      "title": "Failure response",
+      "type": "object",
+      "required": ["success", "message", "errorCode", "correlationId"],
+      "properties": {
+        "success": { "type": "boolean", "const": false },
+        "message": { "type": "string" },
+        "closedYear": { "type": "integer", "const": 0 },
+        "newActiveYear": { "type": "integer", "const": 0 },
+        "correlationId": { "type": "string" },
+        "errorCode": {
+          "type": "string",
+          "enum": [
+            "YEAR_NOT_ACTIVE",
+            "YEAR_ALREADY_CLOSED",
+            "DOCUMENTS_NOT_ALL_ARCHIVED",
+            "RESERVED_NUMBERS_EXIST",
+            "CONCURRENT_UPDATE",
+            "CLOSE_YEAR_FAILED"
+          ]
+        },
+        "failedPrecondition": {
+          "type": "string",
+          "description": "Human-readable description of which precondition failed and why. Empty string if not a precondition failure."
+        }
+      }
+    }
+  ],
+  "errorCodes": {
+    "YEAR_NOT_ACTIVE": "Input yearToClose does not match the active year in App Config, or no active registry book exists.",
+    "YEAR_ALREADY_CLOSED": "The active registry book is already marked as closed.",
+    "DOCUMENTS_NOT_ALL_ARCHIVED": "One or more documents for this year are not in Stanje = Arhivirano.",
+    "RESERVED_NUMBERS_EXIST": "One or more items exist in RezervisaniBrojevi for this year.",
+    "CONCURRENT_UPDATE": "The App Config registry book item was modified concurrently (412 on PATCH). The Canvas App should refresh and recheck preconditions before retrying.",
+    "CLOSE_YEAR_FAILED": "General failure during year closing operations, or new registry book creation failed after year was marked closed (admin must inspect App Config)."
+  },
+  "powerAutomateOutputDefinition": {
+    "outputs": [
+      { "name": "success", "type": "boolean" },
+      { "name": "message", "type": "string" },
+      { "name": "closedYear", "type": "integer" },
+      { "name": "newActiveYear", "type": "integer" },
+      { "name": "correlationId", "type": "string" },
+      { "name": "errorCode", "type": "string" },
+      { "name": "failedPrecondition", "type": "string" }
+    ]
+  },
+  "canvasAppGuidance": {
+    "onSuccess": "Show: 'Godina {closedYear} je uspešno zaključena. Sistem je spreman za godinu {newActiveYear}.' Refresh the active year display.",
+    "onYEAR_NOT_ACTIVE": "Show: 'Odabrana godina ne odgovara aktivnoj godini u sistemu. Osvežite stranicu.' Do not allow retry without refreshing App Config data.",
+    "onYEAR_ALREADY_CLOSED": "Show: 'Ova godina je već zaključena.' No user action required.",
+    "onDOCUMENTS_NOT_ALL_ARCHIVED": "Show: 'Postoje dokumenti koji nisu arhivirani. Arhivirajte sve dokumente pre zaključenja.' Navigate user to archive screen.",
+    "onRESERVED_NUMBERS_EXIST": "Show: 'Postoje rezervisani brojevi za ovu godinu. Razrešite rezervisane brojeve pre zaključenja.'",
+    "onCONCURRENT_UPDATE": "Show: 'Zaključenje nije uspelo zbog istovremene izmene. Osvežite stranicu i pokušajte ponovo.'",
+    "onCLOSE_YEAR_FAILED": "Show: 'Zaključenje nije uspelo. Kontaktirajte administratora.' Log correlationId for support."
+  },
+  "examples": [
+    {
+      "success": true,
+      "message": "Godina je uspešno zaključena. Nova delovodna knjiga je kreirana za narednu godinu.",
+      "closedYear": 2026,
+      "newActiveYear": 2027,
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "errorCode": "",
+      "failedPrecondition": ""
+    },
+    {
+      "success": false,
+      "message": "Zaključenje godine nije moguće.",
+      "closedYear": 0,
+      "newActiveYear": 0,
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "errorCode": "DOCUMENTS_NOT_ALL_ARCHIVED",
+      "failedPrecondition": "Postoje dokumenti koji nisu arhivirani."
+    },
+    {
+      "success": false,
+      "message": "Zaključenje godine nije moguće.",
+      "closedYear": 0,
+      "newActiveYear": 0,
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "errorCode": "RESERVED_NUMBERS_EXIST",
+      "failedPrecondition": "Postoje rezervisani brojevi za ovu godinu."
+    }
+  ]
+}

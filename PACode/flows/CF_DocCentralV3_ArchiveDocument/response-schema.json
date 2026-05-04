@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_ArchiveDocument_Response",
+  "title": "CF_DocCentralV3_ArchiveDocument — Response Schema",
+  "description": "Output returned to the Canvas App after the archiving run completes. The response always describes the full batch result — success is false if any document failed.",
+  "oneOf": [
+    {
+      "title": "Full success response",
+      "type": "object",
+      "description": "All documents archived successfully.",
+      "required": ["success", "message", "archivedCount", "failedCount", "failures", "correlationId"],
+      "properties": {
+        "success": { "type": "boolean", "const": true },
+        "message": { "type": "string", "const": "Dokumenti su uspešno arhivirani." },
+        "archivedCount": { "type": "integer", "minimum": 1 },
+        "failedCount": { "type": "integer", "const": 0 },
+        "failures": { "type": "string", "const": "[]", "description": "Empty JSON array string." },
+        "correlationId": { "type": "string" }
+      }
+    },
+    {
+      "title": "Partial or full failure response",
+      "type": "object",
+      "description": "One or more documents failed. success = false even if some succeeded.",
+      "required": ["success", "message", "archivedCount", "failedCount", "failures", "correlationId"],
+      "properties": {
+        "success": { "type": "boolean", "const": false },
+        "message": { "type": "string" },
+        "archivedCount": { "type": "integer", "minimum": 0 },
+        "failedCount": { "type": "integer", "minimum": 1 },
+        "failures": {
+          "type": "string",
+          "description": "JSON-serialized array of failure entries. Canvas App parses with ParseJSON().",
+          "parsedSchema": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "documentItemId": { "type": "integer" },
+                "delovodniBroj": { "type": "string" },
+                "errorCode": {
+                  "type": "string",
+                  "enum": [
+                    "DOC_NOT_FOUND",
+                    "INVALID_STATUS_FOR_ARCHIVE",
+                    "INVALID_ARCHIVE_SIGN",
+                    "CONCURRENT_UPDATE",
+                    "ARCHIVE_UPDATE_FAILED"
+                  ]
+                },
+                "message": { "type": "string" }
+              }
+            }
+          }
+        },
+        "correlationId": { "type": "string" }
+      }
+    }
+  ],
+  "errorCodes": {
+    "NO_DOCUMENTS_PROVIDED": "Input documents array is empty — returned immediately without entering the loop.",
+    "DOC_NOT_FOUND": "Svi predmeti item with given documentItemId does not exist.",
+    "INVALID_STATUS_FOR_ARCHIVE": "Document Stanje is not Zavedeno. Message includes actual current status.",
+    "INVALID_ARCHIVE_SIGN": "Archive sign value not found in App Config allowed list.",
+    "CONCURRENT_UPDATE": "PATCH returned 412 and re-read confirmed item was modified to a non-Arhivirano state by another process.",
+    "ARCHIVE_UPDATE_FAILED": "PATCH returned an unexpected non-2xx error.",
+    "ARCHIVE_DOCUMENT_FAILED": "Unhandled exception escaped per-document scope — returned from Catch scope."
+  },
+  "powerAutomateOutputDefinition": {
+    "outputs": [
+      { "name": "success", "type": "boolean" },
+      { "name": "message", "type": "string" },
+      { "name": "archivedCount", "type": "integer" },
+      { "name": "failedCount", "type": "integer" },
+      { "name": "failures", "type": "string", "note": "JSON string — Canvas App uses ParseJSON() to read individual failure entries." },
+      { "name": "correlationId", "type": "string" }
+    ]
+  },
+  "canvasAppGuidance": {
+    "onSuccess": "Show confirmation: 'Uspešno arhivirano {archivedCount} dokumenata.' Refresh the document list.",
+    "onPartialFailure": "Show: '{archivedCount} dokumenata arhivirano. {failedCount} nije uspelo.' ParseJSON(failures) to display per-document error details.",
+    "onFullFailure": "Show general error. If errorCode = NO_DOCUMENTS_PROVIDED, the selection was empty — prompt user to select documents.",
+    "idempotencyNote": "If a document was already Arhivirano (e.g. archived by another user), the flow treats this as success (CONCURRENT_UPDATE 412 idempotency check). The Canvas App will not see it as a failure."
+  },
+  "examples": [
+    {
+      "success": true,
+      "message": "Dokumenti su uspešno arhivirani.",
+      "archivedCount": 3,
+      "failedCount": 0,
+      "failures": "[]",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    },
+    {
+      "success": false,
+      "message": "Deo dokumenata nije arhiviran.",
+      "archivedCount": 2,
+      "failedCount": 1,
+      "failures": "[{\"documentItemId\":43,\"delovodniBroj\":\"6/2026\",\"errorCode\":\"INVALID_STATUS_FOR_ARCHIVE\",\"message\":\"Dokument nije u statusu Zavedeno. Trenutni status: U odobravanju\"}]",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    }
+  ]
+}
