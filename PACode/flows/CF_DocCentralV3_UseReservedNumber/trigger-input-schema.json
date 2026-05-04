@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_UseReservedNumber_TriggerInput",
+  "title": "CF_DocCentralV3_UseReservedNumber — Power Apps V2 Trigger Input Schema",
+  "description": "Input parameters for the CF_DocCentralV3_UseReservedNumber child flow. Called by CF_DocCentralV3_CreateDocument when the user selects a reserved registry number for the new document. This flow validates the reserved number but does not delete it — deletion is performed by the parent flow after successful document creation.",
+  "type": "object",
+  "required": [
+    "reservedNumberId",
+    "requestedYear",
+    "initiatorEmail"
+  ],
+  "properties": {
+    "reservedNumberId": {
+      "type": "integer",
+      "description": "SharePoint item ID from the RezervisaniBrojevi list. Must be a positive integer referencing an existing reserved number item.",
+      "minimum": 1,
+      "examples": [7, 42]
+    },
+    "requestedYear": {
+      "type": "integer",
+      "description": "The calendar year the user is registering the document into. Must match the year stored on the reserved number item AND the active year in App Config. Prevents use of reserved numbers from prior or future years.",
+      "minimum": 2000,
+      "examples": [2026]
+    },
+    "initiatorEmail": {
+      "type": "string",
+      "description": "Email address of the user registering the document. Written to AuditLog. Must be non-empty.",
+      "examples": ["korisnik@organizacija.rs"]
+    },
+    "correlationId": {
+      "type": "string",
+      "description": "Correlation ID from the parent flow (CF_DocCentralV3_CreateDocument). Pass the parent's varCorrelationId so that all audit log entries for the document creation share one correlationId. If empty, the flow generates a new GUID.",
+      "default": "",
+      "examples": ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+    }
+  },
+  "examples": [
+    {
+      "reservedNumberId": 7,
+      "requestedYear": 2026,
+      "initiatorEmail": "korisnik@organizacija.rs",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    },
+    {
+      "reservedNumberId": 42,
+      "requestedYear": 2026,
+      "initiatorEmail": "korisnik@organizacija.rs",
+      "correlationId": ""
+    }
+  ],
+  "callerNotes": {
+    "calledBy": "CF_DocCentralV3_CreateDocument",
+    "triggerType": "Power Apps (V2) — child flow",
+    "whenToCall": "Only when the user has selected a reserved number (reservedNumberId > 0). When using auto-generated numbers, call CF_DocCentralV3_GenerateRegistryNumber instead.",
+    "onSuccess": "Use the returned delovodniBroj as the DelovodniBroj field when creating the Svi predmeti item. After successful item creation, delete the RezervisaniBrojevi item using the returned reservedNumberId.",
+    "onFailure": "Stop document creation. Do NOT delete the reserved number. Return failure to the Canvas App.",
+    "deletionNote": "This flow validates only. The caller is responsible for deleting the reserved number item after successful document creation."
+  }
+}
