@@ -64,3 +64,19 @@ Napraviti enterprise-ready Power Platform rešenje za:
 - test matricu
 - deployment instrukcije
 - gap listu ako nešto nije dovoljno definisano
+
+## Pravilo za code output
+
+Svi fajlovi sa kodom koje generišeš moraju biti smešteni u folder `PACode`.
+
+Dokumentacija ide u odgovarajuće dokumentacione foldere.
+
+Primeri za `PACode`:
+
+- Power Apps formule
+- Power Fx snippets
+- Power Automate flow definitions
+- PowerShell skripte
+- SharePoint REST/Graph primeri
+- test skripte
+- helper fajlovi

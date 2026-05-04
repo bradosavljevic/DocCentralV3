@@ -27,3 +27,22 @@ Ovaj folder sadrži uputstva za Claude Code.
 - Backend permissions su obavezne.
 - Zaključana godina se ne može otključati.
 - App Config je konfiguracioni layer.
+
+## PACode pravilo
+
+Svi fajlovi sa kodom koje Claude Code generiše moraju biti smešteni u root folder `PACode`.
+
+Ne sme se generisati code fajl u root folder ili u dokumentacione foldere, osim ako korisnik izričito traži drugačije.
+
+Primeri fajlova koji moraju ići u `PACode`:
+
+- `.powerfx`
+- `.json`
+- `.ps1`
+- `.sh`
+- `.yaml`
+- `.js`
+- `.ts`
+- `.md` fajlovi koji sadrže isključivo code/specifikaciju za izvršenje
+- Power Automate definition/pseudocode fajlovi
+- Power Apps formula fajlovi

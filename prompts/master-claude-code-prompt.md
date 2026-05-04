@@ -34,3 +34,13 @@ Obavezno poštuj:
 - SAP import je van scope-a
 
 Ako nešto nije poznato, napiši NEPOZNATO i predloži šta treba proveriti.
+
+## PACode output rule
+
+Kada generišeš bilo koji fajl sa kodom, obavezno ga smesti u folder `PACode`.
+
+Dokumentacione fajlove smeštaj u postojeće dokumentacione foldere.
+
+Code fajlovi ne smeju biti razbacani kroz root projekta.
+
+Dozvoljeno je da dokumentacija sadrži kratke code block primere, ali svi zasebni fajlovi sa kodom moraju biti u `PACode`.

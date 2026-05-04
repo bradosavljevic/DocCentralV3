@@ -78,3 +78,13 @@ Ako brisanje nije namerno, vrati fajlove iz git-a:
 ```bash
 git restore <putanja-do-fajla>
 ```
+
+## PACode folder
+
+Ako dodaješ samo novu PACode strukturu:
+
+```bash
+git add PACode/ README.md claude-code/README.md prompts/master-claude-code-prompt.md templates/claude-code-development-brief.md github-commands.md
+git commit -m "Add PACode output folder rule"
+git push origin main
+```

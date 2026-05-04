@@ -251,3 +251,23 @@ Claude Code ne sme menjati:
 - pravilo da korisnici nemaju direktan Write u SharePoint
 - pravilo da Create/Edit/Delete ide preko Power Automate
 - pravilo da backend permissions moraju stvarno ograničavati pristup dokumentima
+
+## 18. PACode folder pravilo
+
+Svi fajlovi sa kodom koje Claude Code generiše moraju biti smešteni u folder `PACode`.
+
+Ovo uključuje:
+
+- Power Apps formule
+- Power Fx isečke
+- Power Automate JSON definicije ili pseudocode
+- SharePoint REST/Graph primere
+- PowerShell skripte
+- CLI komande
+- test skripte
+- helper funkcije
+- bilo koji drugi fajl koji predstavlja izvršivi, polu-izvršivi ili tehnički kod
+
+Dokumentacija ostaje u postojećim folderima kao što su `business`, `architecture`, `data-model`, `power-apps`, `power-automate`, `security`, `testing`, `templates`, `skills` i drugi.
+
+Kod ne sme biti razbacan kroz root ili dokumentacione foldere, osim ako je u pitanju kratki primer unutar `.md` dokumenta. Svi zasebni code fajlovi moraju ići u `PACode`.
