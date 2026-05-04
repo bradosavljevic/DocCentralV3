@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_SendReminders_Response",
+  "title": "CF_DocCentralV3_SendReminders — Response Schema",
+  "description": "This flow has no response output. It is a scheduled background flow. Results are written to AuditLog only. This document describes what is logged.",
+  "noOutputNote": "Scheduled flows do not return data to a caller. There is no Respond action. Canvas App cannot receive a response from this flow.",
+  "auditLogEntries": {
+    "started": {
+      "eventType": "SendReminder",
+      "eventCategory": "Reminder",
+      "severity": "Info",
+      "status": "Started",
+      "message": "concat('Pokretanje slanja podsetnika za datum ', varTodayDate)"
+    },
+    "noReminders": {
+      "eventType": "SendReminder",
+      "severity": "Info",
+      "status": "Success",
+      "message": "concat('Nema podsetnika za slanje za datum ', varTodayDate)"
+    },
+    "perReminderSuccess": {
+      "eventType": "SendReminder",
+      "severity": "Info",
+      "status": "Success",
+      "message": "concat('Podsetnik \"<Title>\" je poslat <n> primaocem.')"
+    },
+    "perRecipientEmailFailed": {
+      "eventType": "SendReminder",
+      "severity": "Warning",
+      "status": "Failed",
+      "message": "concat('Slanje podsetnika ID <id> nije uspelo za primaoca: <email>.')"
+    },
+    "noValidRecipients": {
+      "eventType": "SendReminder",
+      "severity": "Warning",
+      "status": "Failed",
+      "message": "concat('Podsetnik ID <id> nema validne primaoce.')"
+    },
+    "isSentUpdateFailed": {
+      "eventType": "SendReminder",
+      "severity": "Warning",
+      "message": "concat('Označavanje podsetnika ID <id> kao poslat nije uspelo. Podsetnik može biti ponovo poslat.')"
+    },
+    "overallSuccess": {
+      "eventType": "SendReminder",
+      "severity": "Info",
+      "status": "Success",
+      "message": "concat('Slanje podsetnika završeno. Poslato: N, Neuspešno: 0.')"
+    },
+    "overallPartialFailure": {
+      "eventType": "SendReminder",
+      "severity": "Warning",
+      "status": "Failed",
+      "message": "concat('Slanje podsetnika završeno. Poslato: N, Neuspešno: M.')"
+    },
+    "catchError": {
+      "eventType": "SendReminder",
+      "severity": "Error",
+      "status": "Failed",
+      "message": "Neočekivana greška pri slanju podsetnika."
+    }
+  },
+  "monitoringNote": "Flow success/failure is visible in Power Automate run history. AuditLog provides business-level visibility of what was sent. Admins should monitor AuditLog Warning entries for missed reminders or IsSent update failures."
+}

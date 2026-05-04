@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_SendReminders_Trigger",
+  "title": "CF_DocCentralV3_SendReminders — Trigger Schema",
+  "description": "This flow uses a Recurrence (Scheduled) trigger. There are no inputs. The flow generates its own correlationId per run.",
+  "triggerType": "Recurrence",
+  "recurrenceConfiguration": {
+    "frequency": "Day",
+    "interval": 1,
+    "startTime": "08:00:00 UTC",
+    "timeZone": "UTC",
+    "note": "The 08:00 UTC default may need to be adjusted for the client's local timezone. If the client is in Central European Time (UTC+1/+2), consider 06:00 UTC to ensure delivery by 08:00 local time. Confirm with App Config timezone setting (UNKNOWN key)."
+  },
+  "concurrencyControl": {
+    "setting": "On",
+    "degreeOfParallelism": 1,
+    "reason": "Prevents two simultaneous daily runs from sending the same reminder twice. Must be configured in flow Settings after creation."
+  },
+  "generatedPerRun": {
+    "correlationId": "guid() — generated at the start of each run for log tracing"
+  },
+  "noInputsNote": "This flow cannot be triggered from Canvas App. It is a background scheduled flow only. If manual triggering is needed (e.g. for testing), use a separate test flow that calls this flow as a child, or test directly in Power Automate by running manually.",
+  "reminderCrudNote": {
+    "scope": "Creating, editing, and deleting reminders is handled in the Canvas App — not in this flow.",
+    "crudOptions": {
+      "optionA": "Canvas App uses Patch() directly to Podsetnici list (users have Write access to Podsetnici only — exception to general Read Only rule).",
+      "optionB": "Canvas App calls a dedicated CRUD flow (not yet in inventory — add if required by security policy).",
+      "decision": "UNKNOWN — confirm with client."
+    }
+  },
+  "podsetniciListRequirements": {
+    "requiredColumns": [
+      { "displayName": "Title", "type": "Text", "internalName": "Title", "status": "Standard SP column" },
+      { "displayName": "ReminderDate", "type": "Date", "internalName": "UNKNOWN", "status": "UNKNOWN" },
+      { "displayName": "RecipientEmails", "type": "Text or People (multi-value)", "internalName": "UNKNOWN", "status": "UNKNOWN — field type determines parse logic" },
+      { "displayName": "CreatedByEmail", "type": "Text", "internalName": "UNKNOWN", "status": "UNKNOWN" },
+      { "displayName": "IsSent", "type": "Yes/No", "internalName": "UNKNOWN", "status": "UNKNOWN — may need to be created" },
+      { "displayName": "SentAt", "type": "Date/Time", "internalName": "UNKNOWN", "status": "UNKNOWN — proposed; create if needed" }
+    ],
+    "note": "Confirm all internal column names and types from the Podsetnici list schema before building the flow."
+  }
+}

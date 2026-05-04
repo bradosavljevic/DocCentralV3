@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_ExportAppConfig_TriggerInput",
+  "title": "CF_DocCentralV3_ExportAppConfig — Trigger Input Schema",
+  "type": "object",
+  "required": ["initiatorEmail"],
+  "properties": {
+    "initiatorEmail": {
+      "type": "string",
+      "format": "email",
+      "description": "Email of the admin user requesting the export. Written to AuditLog.",
+      "powerAppsV2Type": "Text",
+      "internalReference": "triggerBody()?['text_initiatorEmail']"
+    },
+    "correlationId": {
+      "type": "string",
+      "description": "Optional correlation ID. Flow generates a GUID if empty.",
+      "powerAppsV2Type": "Text",
+      "internalReference": "triggerBody()?['text_correlationId']"
+    }
+  },
+  "callerNotes": {
+    "authorization": "Canvas App restricts this button to admin users via gblIsAdmin. The flow does not perform backend role validation. App Config data is non-sensitive configuration — acceptable for v1.",
+    "fileAccess": "The returned fileUrl gives direct access to the exported CSV in the Exports library. Canvas App should offer a 'Download' or 'Open' button using this URL.",
+    "duplicateFiles": "Each call creates a new timestamped file. Old files are not deleted. Manual cleanup is an admin responsibility.",
+    "connectionDependency": "CR_DocCentralV3_SharePoint must have Write access to the Exports library."
+  },
+  "canvasAppCall": {
+    "pattern": "CF_DocCentralV3_ExportAppConfig.Run(User().Email, GUID())",
+    "note": "No additional inputs required. Call on button click from the Administracija screen."
+  }
+}

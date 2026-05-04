@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_GenerateArchiveBookPdf_Response",
+  "title": "CF_DocCentralV3_GenerateArchiveBookPdf — Response Schema",
+  "oneOf": [
+    {
+      "title": "Success response",
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean", "const": true },
+        "message": { "type": "string", "const": "Arhivska knjiga je uspešno generisana." },
+        "fileUrl": { "type": "string", "description": "Full URL to the HTML file in the Exports library." },
+        "fileName": { "type": "string", "description": "ArhivskaKnjiga_{year}_{YYYYMMDD_HHmmss}.html" },
+        "correlationId": { "type": "string" },
+        "errorCode": { "type": "string", "const": "" }
+      }
+    },
+    {
+      "title": "Failure response",
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean", "const": false },
+        "message": { "type": "string" },
+        "fileUrl": { "type": "string", "const": "" },
+        "fileName": { "type": "string", "const": "" },
+        "correlationId": { "type": "string" },
+        "errorCode": {
+          "type": "string",
+          "enum": ["ARCHIVE_BOOK_GENERATION_FAILED", "FILE_SAVE_FAILED"]
+        }
+      }
+    }
+  ],
+  "powerAutomateOutputDefinition": {
+    "outputs": [
+      { "name": "success", "type": "boolean" },
+      { "name": "message", "type": "string" },
+      { "name": "fileUrl", "type": "string" },
+      { "name": "fileName", "type": "string" },
+      { "name": "correlationId", "type": "string" },
+      { "name": "errorCode", "type": "string" }
+    ]
+  },
+  "canvasAppGuidance": {
+    "onSuccess": "Show: 'Arhivska knjiga za {year} je generisana.' Provide a Launch(fileUrl) button labeled 'Preuzmi / Otvori'. The user opens the HTML in a browser and uses browser print → Save as PDF.",
+    "onEmptyYear": "success = true even with no archived documents. The HTML file contains an informational empty-state message. Do not show an error to the user.",
+    "onFailure": "Show: 'Generisanje nije uspelo. Pokušajte ponovo.' Include correlationId for support.",
+    "multipleGenerations": "Each call creates a new timestamped HTML file. Previous files are not overwritten. The Exports library accumulates files — remind admins to clean up periodically."
+  },
+  "htmlFileSpec": {
+    "encoding": "UTF-8 with BOM (U+FEFF prepended)",
+    "printLayout": "A4 landscape via @media print CSS",
+    "columns": ["R. br.", "Delovodni broj", "Datum zavođenja", "Predmet / sadržaj", "Partner", "Tip dokumenta", "Arhivski znak", "Datum arhiviranja", "Ko je arhivirao"],
+    "sortOrder": "By DelovodniBroj ascending (UNKNOWN — depends on available sort column)",
+    "fullSpec": "See PACode/sharepoint/archive-book-output.md"
+  },
+  "examples": [
+    {
+      "success": true,
+      "message": "Arhivska knjiga je uspešno generisana.",
+      "fileUrl": "https://tenant.sharepoint.com/sites/DocCentral/Exports/ArhivskaKnjiga_2026_20261215_083012.html",
+      "fileName": "ArhivskaKnjiga_2026_20261215_083012.html",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "errorCode": ""
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_GenerateArchiveBookPdf_TriggerInput",
+  "title": "CF_DocCentralV3_GenerateArchiveBookPdf — Trigger Input Schema",
+  "type": "object",
+  "required": ["year", "initiatorEmail"],
+  "properties": {
+    "year": {
+      "type": "integer",
+      "description": "Registry year for which to generate the archive book. May be the active year or any previously closed year. No restriction on value.",
+      "powerAppsV2Type": "Number",
+      "internalReference": "triggerBody()?['decimal_year']",
+      "parsedAs": "int(triggerBody()?['decimal_year'])",
+      "example": 2026
+    },
+    "initiatorEmail": {
+      "type": "string",
+      "format": "email",
+      "description": "Email of the user requesting the archive book. Written to AuditLog.",
+      "powerAppsV2Type": "Text",
+      "internalReference": "triggerBody()?['text_initiatorEmail']"
+    },
+    "correlationId": {
+      "type": "string",
+      "description": "Optional correlation ID. Flow generates a GUID if empty.",
+      "powerAppsV2Type": "Text",
+      "internalReference": "triggerBody()?['text_correlationId']"
+    }
+  },
+  "callerNotes": {
+    "yearSource": "Canvas App should pre-populate the year field from the active year or allow the user to select a year from a dropdown of available years (active + closed).",
+    "noYearRestriction": "The flow does not validate whether the year is closed or open. Any year value is accepted. This allows generating the archive book at any point — including mid-year.",
+    "emptyResult": "If no archived documents exist for the requested year, the flow still succeeds and returns an HTML file with a header and an empty-data message row. Canvas App should not treat empty result as an error.",
+    "fileAccess": "The returned fileUrl gives direct access to the HTML file in the Exports library. Canvas App offers a 'Download' or 'Open in browser' button. The user then uses browser print to produce a PDF.",
+    "pdfInstructions": "To convert the HTML to PDF: open the file in a browser → Ctrl+P → Save as PDF. The HTML is A4 landscape print-ready per the embedded CSS."
+  },
+  "canvasAppCall": {
+    "pattern": "CF_DocCentralV3_GenerateArchiveBookPdf.Run(varSelectedYear, User().Email, GUID())",
+    "note": "varSelectedYear is an integer from a year selector control."
+  }
+}

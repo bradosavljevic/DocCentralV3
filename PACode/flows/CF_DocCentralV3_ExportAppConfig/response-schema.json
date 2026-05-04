@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_ExportAppConfig_Response",
+  "title": "CF_DocCentralV3_ExportAppConfig — Response Schema",
+  "oneOf": [
+    {
+      "title": "Success response",
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean", "const": true },
+        "message": { "type": "string", "const": "App Config je uspešno eksportovan." },
+        "fileUrl": { "type": "string", "description": "Full URL to the CSV file in the Exports library. Canvas App launches this URL for download." },
+        "fileName": { "type": "string", "description": "File name: AppConfig_Export_YYYYMMDD_HHmmss.csv" },
+        "correlationId": { "type": "string" },
+        "errorCode": { "type": "string", "const": "" }
+      }
+    },
+    {
+      "title": "Failure response",
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean", "const": false },
+        "message": { "type": "string" },
+        "fileUrl": { "type": "string", "const": "" },
+        "fileName": { "type": "string", "const": "" },
+        "correlationId": { "type": "string" },
+        "errorCode": {
+          "type": "string",
+          "enum": ["EXPORT_FAILED"]
+        }
+      }
+    }
+  ],
+  "powerAutomateOutputDefinition": {
+    "outputs": [
+      { "name": "success", "type": "boolean" },
+      { "name": "message", "type": "string" },
+      { "name": "fileUrl", "type": "string" },
+      { "name": "fileName", "type": "string" },
+      { "name": "correlationId", "type": "string" },
+      { "name": "errorCode", "type": "string" }
+    ]
+  },
+  "canvasAppGuidance": {
+    "onSuccess": "Show: 'Eksport uspešan. Fajl: {fileName}.' Provide a Launch(fileUrl) button or link so the admin can download the file.",
+    "onFailure": "Show: 'Eksport nije uspeo. Pokušajte ponovo.' Include correlationId in error display for support reference.",
+    "emptyAppConfig": "If App Config is empty, a CSV with headers only is still created successfully. success = true. The file downloads but contains only the column header row."
+  },
+  "csvFormat": {
+    "encoding": "UTF-8 with BOM (U+FEFF prepended)",
+    "separator": "comma (,)",
+    "quoting": "Fields containing commas or double-quotes are wrapped in double-quotes. Internal double-quotes are escaped as double-double-quotes (\"\")",
+    "lineEnding": "LF (\\n — decodeUriComponent('%0A'))",
+    "nullValues": "Written as empty field",
+    "columns": "UNKNOWN — depends on App Config schema. Confirm before building.",
+    "exampleColumns": "Category,Key,Value,Description,IsActive"
+  },
+  "examples": [
+    {
+      "success": true,
+      "message": "App Config je uspešno eksportovan.",
+      "fileUrl": "https://tenant.sharepoint.com/sites/DocCentral/Exports/AppConfig_Export_20260504_083015.csv",
+      "fileName": "AppConfig_Export_20260504_083015.csv",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "errorCode": ""
+    }
+  ]
+}
