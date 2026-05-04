@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_ProcessApprovalResponse_Response",
+  "title": "CF_DocCentralV3_ProcessApprovalResponse — Response Schema",
+  "description": "Output returned to the Canvas App after an approver submits their decision. The nextAction field tells the Canvas App what happened so it can update the UI accordingly.",
+  "oneOf": [
+    {
+      "title": "Success response",
+      "type": "object",
+      "required": ["success", "nextAction", "correlationId"],
+      "properties": {
+        "success": { "type": "boolean", "const": true },
+        "message": { "type": "string", "const": "Odgovor je zabeležen." },
+        "nextAction": {
+          "type": "string",
+          "description": "What happened as a result of this response. Canvas App uses this to update the document list and show appropriate confirmation.",
+          "enum": ["NextStepActivated", "ProcessComplete", "DocumentRejected"]
+        },
+        "correlationId": { "type": "string" },
+        "errorCode": { "type": "string", "const": "" }
+      }
+    },
+    {
+      "title": "Failure response",
+      "type": "object",
+      "required": ["success", "message", "errorCode", "correlationId"],
+      "properties": {
+        "success": { "type": "boolean", "const": false },
+        "message": { "type": "string" },
+        "nextAction": { "type": "string", "const": "" },
+        "correlationId": { "type": "string" },
+        "errorCode": {
+          "type": "string",
+          "enum": [
+            "DOCUMENT_NOT_FOUND",
+            "NOT_IN_APPROVAL",
+            "APPROVAL_STATE_INVALID",
+            "STEP_ALREADY_RESOLVED",
+            "RESPONDER_NOT_AUTHORIZED",
+            "INVALID_OUTCOME",
+            "STATUS_UPDATE_FAILED",
+            "PROCESS_APPROVAL_RESPONSE_FAILED"
+          ]
+        }
+      }
+    }
+  ],
+  "nextActionGuidance": {
+    "NextStepActivated": "Step approved, next step is now active. Refresh the approval queue — this document will still appear if the current user is the next step's approver. Show 'Korak odobren. Dokument je prosleđen sledećem odobravaocu.'",
+    "ProcessComplete": "All steps approved. Document is now Odobreno. Remove from approval queue. Show 'Dokument je odobren.'",
+    "DocumentRejected": "Document rejected. Document is now Odbijeno. Remove from approval queue. Show 'Dokument je odbijen. Inicijator je obavešten.'"
+  },
+  "examples": [
+    { "success": true, "message": "Odgovor je zabeležen.", "nextAction": "NextStepActivated", "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "errorCode": "" },
+    { "success": true, "message": "Odgovor je zabeležen.", "nextAction": "ProcessComplete", "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "errorCode": "" },
+    { "success": true, "message": "Odgovor je zabeležen.", "nextAction": "DocumentRejected", "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "errorCode": "" },
+    { "success": false, "message": "Korak je već razrešen.", "nextAction": "", "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "errorCode": "STEP_ALREADY_RESOLVED" },
+    { "success": false, "message": "Niste ovlašćeni za odobravanje ovog dokumenta.", "nextAction": "", "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6", "errorCode": "RESPONDER_NOT_AUTHORIZED" }
+  ],
+  "powerAutomateOutputDefinition": {
+    "outputs": [
+      { "name": "success", "type": "boolean" },
+      { "name": "message", "type": "string" },
+      { "name": "nextAction", "type": "string" },
+      { "name": "correlationId", "type": "string" },
+      { "name": "errorCode", "type": "string" }
+    ]
+  }
+}

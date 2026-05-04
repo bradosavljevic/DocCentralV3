@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_ProcessApprovalResponse_TriggerInput",
+  "title": "CF_DocCentralV3_ProcessApprovalResponse — Power Apps V2 Trigger Input Schema",
+  "description": "Input parameters for CF_DocCentralV3_ProcessApprovalResponse. Called from the Canvas App (scrZaOdobrenje) when an approver clicks Approve or Reject. The flow validates the responder's authorization, updates approval state on the Svi predmeti item, and advances or closes the approval process.",
+  "type": "object",
+  "required": ["documentItemId", "outcome", "responderEmail"],
+  "properties": {
+    "documentItemId": {
+      "type": "integer",
+      "description": "SharePoint item ID from Svi predmeti for the document being approved or rejected.",
+      "minimum": 1
+    },
+    "outcome": {
+      "type": "string",
+      "description": "The approver's decision.",
+      "enum": ["Approved", "Rejected"]
+    },
+    "comments": {
+      "type": "string",
+      "description": "Optional comment from the approver. Stored in both KoraciOdobravanjaJson and IstorijaOdobravanjaJson.",
+      "default": ""
+    },
+    "responderEmail": {
+      "type": "string",
+      "description": "Email of the user submitting the response. Validated by the flow against the current step's assignee (TrenutniOdobravalacEmail or group membership).",
+      "examples": ["odobravalac@organizacija.rs"]
+    },
+    "responderDisplayName": {
+      "type": "string",
+      "description": "Display name of the responder. Stored in IstorijaOdobravanjaJson for the history record.",
+      "default": "",
+      "examples": ["Korisnik Prezime"]
+    },
+    "correlationId": {
+      "type": "string",
+      "description": "Correlation ID from the caller. If empty, the flow generates a new GUID.",
+      "default": ""
+    }
+  },
+  "examples": [
+    {
+      "documentItemId": 42,
+      "outcome": "Approved",
+      "comments": "",
+      "responderEmail": "odobravalac@organizacija.rs",
+      "responderDisplayName": "Odobravalac Prezime",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    },
+    {
+      "documentItemId": 42,
+      "outcome": "Rejected",
+      "comments": "Nedostaje prilog.",
+      "responderEmail": "odobravalac@organizacija.rs",
+      "responderDisplayName": "Odobravalac Prezime",
+      "correlationId": ""
+    }
+  ],
+  "callerNotes": {
+    "calledBy": "Canvas App — scrZaOdobrenje screen",
+    "authorizationNote": "The Canvas App shows only documents where the current user is the current approver (TrenutniOdobravalacEmail) or member of the current approver group (TrenutnaGrupaOdobravanjaId). However, the flow performs its own authorization check — Canvas App filtering is not a security guarantee.",
+    "concurrencyNote": "For group steps, two members may submit simultaneously. The flow uses ETag/If-Match to ensure only one response is accepted. The second caller receives STEP_ALREADY_RESOLVED.",
+    "commentsNote": "Comments are required when rejecting (enforced in Canvas App UI). Pass empty string for approvals without comment. The flow does not enforce this server-side."
+  }
+}
