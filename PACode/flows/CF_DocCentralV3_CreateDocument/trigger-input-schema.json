@@ -1,0 +1,143 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_CreateDocument_TriggerInput",
+  "title": "CF_DocCentralV3_CreateDocument — Power Apps V2 Trigger Input Schema",
+  "description": "Input parameters for CF_DocCentralV3_CreateDocument. Called directly from the Canvas App (scrNoviPredmet screen) when the user submits the document registration form. All structured inputs (metadata, files, attachments) are serialized as JSON strings due to Power Apps V2 trigger Array/Object type limitations.",
+  "type": "object",
+  "required": [
+    "documentType",
+    "useReservedNumber",
+    "initiatorEmail",
+    "mainFileJson"
+  ],
+  "properties": {
+    "documentType": {
+      "type": "string",
+      "description": "Document type string. Must match an allowed document type in App Config. Examples depend on client configuration — values are UNKNOWN until AppConfig.csv is provided.",
+      "examples": ["Ulazni", "Izlazni", "Interni"]
+    },
+    "useReservedNumber": {
+      "type": "boolean",
+      "description": "True = use a pre-reserved number from RezervisaniBrojevi. False = generate the next sequential number via CF_DocCentralV3_GenerateRegistryNumber.",
+      "default": false
+    },
+    "reservedNumberId": {
+      "type": "integer",
+      "description": "SharePoint item ID from RezervisaniBrojevi. Required when useReservedNumber = true. Pass 0 when useReservedNumber = false.",
+      "default": 0,
+      "minimum": 0
+    },
+    "filingDate": {
+      "type": "string",
+      "description": "Date the document is filed, in ISO 8601 format (YYYY-MM-DD). Required when useReservedNumber = true — the user specifies the date for reserved number documents. When useReservedNumber = false, the flow sets this to today's UTC date automatically; pass empty string.",
+      "default": "",
+      "examples": ["2026-01-15", ""]
+    },
+    "initiatorEmail": {
+      "type": "string",
+      "description": "Email address of the user registering the document. Used for audit logging and permission assignment. Must be non-empty.",
+      "examples": ["korisnik@organizacija.rs"]
+    },
+    "correlationId": {
+      "type": "string",
+      "description": "Correlation ID for end-to-end audit log tracing. If empty, the flow generates a new GUID. The Canvas App may pass an empty string; the flow always returns the used correlationId in the response.",
+      "default": "",
+      "examples": ["3fa85f64-5717-4562-b3fc-2c963f66afa6", ""]
+    },
+    "metadataJson": {
+      "type": "string",
+      "description": "JSON string containing document metadata. Parsed inside the flow using json(). Must be valid JSON. See metadataJson schema below.",
+      "examples": ["{\"subject\":\"Ugovor o saradnji\",\"description\":\"Opis dokumenta\",\"partnerNaziv\":\"ABC d.o.o.\",\"partnerId\":5,\"partnerPIBSnapshot\":\"123456789\",\"partnerMestoSnapshot\":\"Beograd\",\"partnerAdresaSnapshot\":\"Ulica 1\",\"customFields\":{}}"]
+    },
+    "mainFileJson": {
+      "type": "string",
+      "description": "JSON string containing the main document file. Must include fileName and fileContentBase64. Parsed inside the flow using json().",
+      "examples": ["{\"fileName\":\"ugovor.pdf\",\"fileContentBase64\":\"JVBERi0xLjQ...\"}"]
+    },
+    "attachmentsJson": {
+      "type": "string",
+      "description": "JSON string containing an array of attachment file objects. Each object has fileName and fileContentBase64. Pass '[]' if no attachments. Parsed inside the flow using json().",
+      "default": "[]",
+      "examples": ["[{\"fileName\":\"prilog1.pdf\",\"fileContentBase64\":\"JVBERi0...\"}]", "[]"]
+    }
+  },
+  "metadataJsonSchema": {
+    "type": "object",
+    "description": "Structure of the object inside metadataJson string.",
+    "properties": {
+      "subject": {
+        "type": "string",
+        "description": "Document subject / Title. Mapped to Svi predmeti Title column. Required."
+      },
+      "description": {
+        "type": "string",
+        "description": "Document description. Mapped to Svi predmeti Description column (UNKNOWN internal name).",
+        "default": ""
+      },
+      "partnerNaziv": {
+        "type": "string",
+        "description": "Partner / sender / recipient name snapshot. Stored on document item, not linked to live partner record.",
+        "default": ""
+      },
+      "partnerId": {
+        "type": ["integer", "null"],
+        "description": "SharePoint item ID from Partneri list. Null if no partner.",
+        "default": null
+      },
+      "partnerPIBSnapshot": {
+        "type": "string",
+        "description": "Partner tax ID (PIB) snapshot at time of registration.",
+        "default": ""
+      },
+      "partnerMestoSnapshot": {
+        "type": "string",
+        "description": "Partner city snapshot at time of registration.",
+        "default": ""
+      },
+      "partnerAdresaSnapshot": {
+        "type": "string",
+        "description": "Partner address snapshot at time of registration.",
+        "default": ""
+      },
+      "customFields": {
+        "type": "object",
+        "description": "Document-type-specific additional fields. Keys and values are UNKNOWN until AppConfig.csv defines them per document type.",
+        "default": {}
+      }
+    },
+    "required": ["subject"]
+  },
+  "examples": [
+    {
+      "_scenario": "New number, main file only",
+      "documentType": "Ulazni",
+      "useReservedNumber": false,
+      "reservedNumberId": 0,
+      "filingDate": "",
+      "initiatorEmail": "korisnik@organizacija.rs",
+      "correlationId": "",
+      "metadataJson": "{\"subject\":\"Faktura br. 2026-001\",\"description\":\"\",\"partnerNaziv\":\"ABC d.o.o.\",\"partnerId\":5,\"partnerPIBSnapshot\":\"123456789\",\"partnerMestoSnapshot\":\"Beograd\",\"partnerAdresaSnapshot\":\"Ulica 1\",\"customFields\":{}}",
+      "mainFileJson": "{\"fileName\":\"faktura-2026-001.pdf\",\"fileContentBase64\":\"JVBERi0xLjQ...\"}",
+      "attachmentsJson": "[]"
+    },
+    {
+      "_scenario": "Reserved number, with one attachment",
+      "documentType": "Ulazni",
+      "useReservedNumber": true,
+      "reservedNumberId": 7,
+      "filingDate": "2026-01-15",
+      "initiatorEmail": "korisnik@organizacija.rs",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "metadataJson": "{\"subject\":\"Ugovor o saradnji\",\"description\":\"Opis\",\"partnerNaziv\":\"XYZ d.o.o.\",\"partnerId\":null,\"partnerPIBSnapshot\":\"\",\"partnerMestoSnapshot\":\"\",\"partnerAdresaSnapshot\":\"\",\"customFields\":{}}",
+      "mainFileJson": "{\"fileName\":\"ugovor.pdf\",\"fileContentBase64\":\"JVBERi0xLjQ...\"}",
+      "attachmentsJson": "[{\"fileName\":\"prilog1.pdf\",\"fileContentBase64\":\"JVBERi0...\"}]"
+    }
+  ],
+  "callerNotes": {
+    "calledBy": "Canvas App — scrNoviPredmet screen",
+    "triggerType": "Power Apps (V2) — direct Canvas App call",
+    "jsonSerializationNote": "The Canvas App must serialize metadataJson, mainFileJson, and attachmentsJson using JSON() formula before passing to the flow. Example Canvas App formula: JSON({subject: txtSubject.Text, partnerNaziv: txtPartner.Text, ...})",
+    "base64Note": "File content must be Base64-encoded by the Canvas App. Use the Canvas App Attachment control's base64 encoded content. Max file size depends on Power Automate limits (25 MB per action for base64 encoded content).",
+    "correlationIdNote": "The Canvas App may pass an empty string. The flow always returns the used correlationId. Store it in the Canvas App after the call for display or debugging."
+  }
+}
