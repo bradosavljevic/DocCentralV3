@@ -1,4 +1,4 @@
-# App Config — Stanja
+# App Config — Tipovi dokumenata
 
 ## Status
 

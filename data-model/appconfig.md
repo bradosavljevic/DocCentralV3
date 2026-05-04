@@ -1,4 +1,4 @@
-# Data Model — Exports
+# Data Model — AppConfig
 
 ## Status
 
@@ -8,7 +8,7 @@ DOPUNJENO POSTOJEĆOM DOKUMENTACIJOM I SOLUTION NALAZIMA
 
 ## Dopuna
 
-Povezan flow: `CF_DocCentral21_ExportCodes`. Export fajlovi treba da imaju metadata, operation ID, status, verziju i retention pravila.
+App Config je izvor za `colMasterData`. Koristi se za šifarnike, delovodne knjige, stanja, prevode, podešavanja i proces konfiguraciju.
 
 ## Povezani dokumenti
 

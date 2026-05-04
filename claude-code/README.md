@@ -1,34 +1,12 @@
-# Claude Code – radna uputstva
+# Claude Code instructions
 
-Ovaj folder sadrži pravila, uputstva i promptove za rad sa Claude Code nad projektom dokumentacije i budućeg razvoja DocCentral / e-pisarnica rešenja.
+Claude Code mora koristiti ovu dokumentaciju kao izvor istine.
 
-Cilj nije direktno menjanje produkcionog Power Platform rešenja, već:
-- analiza postojećeg rešenja,
-- izrada tehničke dokumentacije,
-- priprema development brief-a,
-- priprema strukture za buduću novu verziju aplikacije,
-- standardizacija načina rada kroz promptove i checkliste.
+## Pravila
 
-## Osnovno pravilo
-
-Claude Code treba da radi isključivo nad fajlovima u ovom GitHub repozitorijumu.
-
-Ne sme da pretpostavlja nepostojeće elemente rešenja. Ako naziv liste, kolone, flow-a, ekrana, konektora ili permission modela nije potvrđen iz dostavljenih fajlova, mora da ga označi kao:
-
-`NEPOZNATO`
-
-## Obavezna struktura odgovora
-
-Svaki tehnički zaključak mora biti razdvojen na:
-
-- Činjenice
-- Pretpostavke
-- Nepoznato
-- Rizici
-- Preporuke
-
-## Jezik
-
-Primarni jezik dokumentacije: srpski.
-
-Engleski se koristi samo kada je naziv tehnologije, konektora, API-ja, foldera, fajla ili Power Platform objekta prirodno na engleskom.
+- Ne izmišljati liste, kolone, flow-ove, ekrane i connection reference.
+- Svaku nepoznanicu označiti kao `NEPOZNATO`.
+- Svaku preporuku označiti kao `PREPORUKA`.
+- Create/Edit/Delete voditi kroz Power Automate backend.
+- Korisnike tretirati kao SharePoint Read Only.
+- Delovodni broj tretirati kao enterprise-critical concurrency problem.
