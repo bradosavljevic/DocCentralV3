@@ -1,0 +1,62 @@
+[
+  {
+    "Title": "Trajno",
+    "BrojMeseci": "0",
+    "TrajnoCuvanje": "true"
+  },
+  {
+    "Title": "5 godina",
+    "BrojMeseci": "60",
+    "TrajnoCuvanje": "false"
+  },
+  {
+    "Title": "10 godina",
+    "BrojMeseci": "120",
+    "TrajnoCuvanje": "false"
+  },
+  {
+    "Title": "10 godina od isteka zakupa",
+    "BrojMeseci": "120",
+    "TrajnoCuvanje": "false"
+  },
+  {
+    "Title": "10 godina (po okončanju predmeta)",
+    "BrojMeseci": "120",
+    "TrajnoCuvanje": "false"
+  },
+  {
+    "Title": "5 godina po okončanju predmeta",
+    "BrojMeseci": "60",
+    "TrajnoCuvanje": "false"
+  },
+  {
+    "Title": "3 godine",
+    "BrojMeseci": "36",
+    "TrajnoCuvanje": "false"
+  },
+  {
+    "Title": "2 godine",
+    "BrojMeseci": "24",
+    "TrajnoCuvanje": "false"
+  },
+  {
+    "Title": "20 godina",
+    "BrojMeseci": "24",
+    "TrajnoCuvanje": "false"
+  },
+  {
+    "Title": "40 godina",
+    "BrojMeseci": "48",
+    "TrajnoCuvanje": "false"
+  },
+  {
+    "Title": "6 godina od dana prestanka važenja stručnog nalaza",
+    "BrojMeseci": "72",
+    "TrajnoCuvanje": "false"
+  },
+  {
+    "Title": "3 godine od dana prestanka korišćenja opasne materije",
+    "BrojMeseci": "36",
+    "TrajnoCuvanje": "false"
+  }
+]

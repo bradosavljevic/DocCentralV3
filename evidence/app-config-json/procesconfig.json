@@ -1,0 +1,150 @@
+[
+  {
+    "TipDokumenta": "Fakture",
+    "Iznos": [
+      {
+        "Valuta": "EUR",
+        "Iznos": 100000
+      },
+      {
+        "Valuta": "USD",
+        "Iznos": 500000
+      },
+      {
+        "Valuta": "USD",
+        "Iznos": 500000
+      }
+    ],
+    "RedosledKoraka": 1,
+    "RedosledKorakaTreshold": 1,
+    "NacinOdobravanja": "App",
+    "OdobravalacGrupa": "s_b.radosavljevic@gopro.rs",
+    "NazivKoraka": "Odobrenje sektor menadžer",
+    "Aktivan": true,
+    "KomentarObavezan": true,
+    "OrganizacionaJedinica": "",
+    "Napomena": "Za sve fakture manje od 100.000 RSD"
+  },
+  {
+    "TipDokumenta": "Fakture",
+    "Iznos": [
+      {
+        "Valuta": "EUR",
+        "Iznos": 100000
+      },
+      {
+        "Valuta": "USD",
+        "Iznos": 500000
+      },
+      {
+        "Valuta": "USD",
+        "Iznos": 500000
+      }
+    ],
+    "RedosledKoraka": 2,
+    "RedosledKorakaTreshold": 2,
+    "NacinOdobravanja": "App",
+    "OdobravalacGrupa": "s_b.radosavljevic@gopro.rs",
+    "NazivKoraka": "Finansijska kontrola",
+    "Aktivan": true,
+    "KomentarObavezan": true,
+    "OrganizacionaJedinica": "",
+    "Napomena": "Za sve fakture manje od 100.000 RSD"
+  },
+  {
+    "TipDokumenta": "Fakture",
+    "Iznos": [
+      {
+        "Valuta": "EUR",
+        "Iznos": 100000
+      },
+      {
+        "Valuta": "USD",
+        "Iznos": 500000
+      },
+      {
+        "Valuta": "USD",
+        "Iznos": 500000
+      }
+    ],
+    "RedosledKoraka": 3,
+    "RedosledKorakaTreshold": 3,
+    "NacinOdobravanja": "App",
+    "OdobravalacGrupa": "s_b.radosavljevic@gopro.rs",
+    "NazivKoraka": "Finansijski menadzment kontrola",
+    "Aktivan": true,
+    "KomentarObavezan": true,
+    "OrganizacionaJedinica": "",
+    "Napomena": "Za sve fakture manje od 100.000 RSD"
+  },
+  {
+    "TipDokumenta": "Fakture",
+    "Iznos": [
+      {
+        "Valuta": "EUR",
+        "Iznos": 100000
+      },
+      {
+        "Valuta": "USD",
+        "Iznos": 500000
+      },
+      {
+        "Valuta": "USD",
+        "Iznos": 500000
+      }
+    ],
+    "RedosledKoraka": "",
+    "RedosledKorakaTreshold": 4,
+    "NacinOdobravanja": "App",
+    "OdobravalacGrupa": "s_b.radosavljevic@gopro.rs",
+    "NazivKoraka": "Menadzment kontrola",
+    "Aktivan": true,
+    "KomentarObavezan": true,
+    "OrganizacionaJedinica": "",
+    "Napomena": "Za sve fakture manje od 100.000 RSD"
+  },
+  {
+    "TipDokumenta": "Fakture",
+    "Iznos": [
+      {
+        "Valuta": "EUR",
+        "Iznos": 100000
+      },
+      {
+        "Valuta": "USD",
+        "Iznos": 500000
+      },
+      {
+        "Valuta": "USD",
+        "Iznos": 500000
+      }
+    ],
+    "RedosledKoraka": 4,
+    "RedosledKorakaTreshold": 5,
+    "NacinOdobravanja": "App",
+    "OdobravalacGrupa": "s_b.radosavljevic@gopro.rs",
+    "NazivKoraka": "Administracija",
+    "Aktivan": true,
+    "KomentarObavezan": true,
+    "OrganizacionaJedinica": "",
+    "Napomena": "Za sve fakture manje od 100.000 RSD"
+  },
+  {
+    "TipDokumenta": "Fakture",
+    "Iznos": [
+      {
+        "Valuta": "EUR",
+        "Iznos": 1000
+      }
+    ],
+    "RedosledKoraka": 1,
+    "RedosledKorakaTreshold": 1,
+    "NacinOdobravanja": "App",
+    "OdobravalacGrupa": "s_b.radosavljevic@gopro.rs",
+    "NazivKoraka": "Odobrenje Accounting",
+    "Aktivan": true,
+    "KomentarObavezan": true,
+    "OrganizacionaJedinica": "Magacin",
+    "Napomena": "Za sve ugovore manje od 100.000 RSD"
+  }
+]

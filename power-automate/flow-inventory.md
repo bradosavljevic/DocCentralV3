@@ -1,73 +1,106 @@
-# Power Automate — Flow Inventory
+# Power Automate flow inventory - plan
 
-## Status
+## Cilj
 
-```text
-DOPUNJENO NA OSNOVU POWER PLATFORM SOLUTION-A
-```
+Definisati flow-ove potrebne za novu verziju DocCentral V3.
 
-## Činjenice
+## Predloženi flow-ovi
 
-Solution sadrži 20 flow-ova.
+### 1. RegisterDocument
 
-- `CF_DocCentral21_AddPartner`
-- `CF_DocCentral21_UploadDoc_V4`
-- `CF_DocCentral21_AddWorkbookNumberToNewDocPowerApps`
-- `CF_DocCentral21_GetPartners`
-- `CF_DocCentral21_ResetDelovodnika`
-- `CF_DocCentral21_ProcessFlow`
-- `CF_DocCentral21_EFaktureProces`
-- `CF_DocCentral21_EmailDoc`
-- `CF_DocCentral21_GetFileEmail`
-- `CF_DocCentral21_AdHocApproval`
-- `CF_DocCentral_HTMLTabela`
-- `CF_DocCentral21_LockYear`
-- `CF_DocCentral21_GetLockYearData`
-- `CF_DocCentral21_ExportCodes`
-- `CF_DocCentral21_ArchiveDocumentsV2`
-- `CF_DocCentral21_CheckArchiveBookData`
-- `CF_DocCentral21_DocSwap`
-- `CF_DocCentral21_ReserveNumber`
-- `CF_DocCentral21_UploadDoc_V2`
-- `CF_DocCentral21_AddReminder`
+Svrha:
 
-## Kritični flow-ovi za delovodni broj
+- validacija zahteva
+- generisanje ili korišćenje rezervisanog delovodnog broja
+- kreiranje dokument item-a
+- kreiranje foldera/biblioteke
+- dodela prava
+- audit log
+- odgovor Power Apps aplikaciji
 
-```text
-CF_DocCentral21_AddWorkbookNumberToNewDocPowerApps
-CF_DocCentral21_ReserveNumber
-CF_DocCentral21_ResetDelovodnika
-CF_DocCentral21_LockYear
-CF_DocCentral21_GetLockYearData
-```
+### 2. GenerateOrReserveRegistryNumber
 
-## Kritični flow-ovi za dokumente
+Svrha:
 
-```text
-CF_DocCentral21_UploadDoc_V4
-CF_DocCentral21_UploadDoc_V2
-CF_DocCentral21_DocSwap
-CF_DocCentral21_ArchiveDocumentsV2
-```
+- centralizovano concurrency-safe generisanje broja
+- ETag / optimistic locking
+- retry logika
+- logovanje pokušaja
 
-## Email intake
+### 3. UseReservedNumber
 
-```text
-CF_DocCentral21_EmailDoc
-CF_DocCentral21_GetFileEmail
-```
+Svrha:
 
-## Partneri
+- validacija rezervisanog broja
+- korišćenje rezervisanog broja
+- brisanje nakon uspešnog zavođenja
 
-```text
-CF_DocCentral21_AddPartner
-CF_DocCentral21_GetPartners
-```
+### 4. StartApprovalProcess
 
-## Nepoznato
+Svrha:
 
-Za svaki flow još treba dokumentovati trigger, akcije, input/output schema, konektore, retry, error handling, owner, run-only user i service account.
+- pokretanje approval toka
+- slanje korisniku ili grupi
+- status `U odobravanju`
 
-## Preporuka
+### 5. ProcessApprovalResponse
 
-Napraviti poseban `.md` fajl po svakom flow-u u sledećoj fazi.
+Svrha:
+
+- upis rezultata odobravanja
+- promena polja `Stanje`
+- obrada odbijanja
+- vraćanje inicijatoru
+
+### 6. SendDailyReminders
+
+Svrha:
+
+- scheduled flow u 08:00
+- pronalazak današnjih podsetnika
+- slanje email-a
+- sprečavanje duplog slanja
+- logovanje grešaka
+
+### 7. ArchiveDocuments
+
+Svrha:
+
+- arhiviranje dokumenata iz statusa `Zavedeno`
+- dodela arhivskih znakova
+- promena statusa u `Arhivirano`
+- logovanje
+
+### 8. CloseRegistryYear
+
+Svrha:
+
+- proverava da su svi dokumenti arhivirani
+- proverava da nema rezervisanih brojeva
+- zaključava godinu
+- kreira novu delovodnu knjigu
+- menja aktivnu godinu u App Config
+- loguje rezultat
+
+### 9. ExportConfigurationToExcel
+
+Svrha:
+
+- export jednog šifarnika
+- export svih šifarnika
+
+### 10. GenerateArchiveBookPdf
+
+Svrha:
+
+- generisanje PDF Arhivske knjige
+- čuvanje PDF-a u odgovarajuću biblioteku/folder
+- logovanje
+
+## Obavezni standardi
+
+- svaki kritičan flow mora imati error handling
+- svaki kritičan flow mora pisati log
+- koristiti correlation id
+- vraćati kontrolisan response u Power Apps
+- Create/Edit/Delete u SharePoint raditi pod servisnim nalogom

@@ -1,0 +1,182 @@
+[
+  {
+    "Title": "Ugovor o poslovno-tehničkoj saradnji",
+    "VrstaDokumenta": "Ugovori"
+  },
+  {
+    "Title": "Ugovor o kupoprodaji",
+    "VrstaDokumenta": "Ugovori"
+  },
+  {
+    "Title": "Ugovor o donaciji",
+    "VrstaDokumenta": "Ugovori"
+  },
+  {
+    "Title": "Ugovor o zakupu",
+    "VrstaDokumenta": "Ugovori"
+  },
+  {
+    "Title": "NDA",
+    "VrstaDokumenta": "Ugovori"
+  },
+  {
+    "Title": "Ugovor o lizingu",
+    "VrstaDokumenta": "Ugovori"
+  },
+  {
+    "Title": "Ugovor sa bankama",
+    "VrstaDokumenta": "Ugovori"
+  },
+  {
+    "Title": "Ugovor o zajmu",
+    "VrstaDokumenta": "Ugovori"
+  },
+  {
+    "Title": "Aneks ugovora",
+    "VrstaDokumenta": "Ugovori"
+  },
+  {
+    "Title": "Ugovor o komunalnim uslugama",
+    "VrstaDokumenta": "Ugovori"
+  },
+  {
+    "Title": "Ugovor o pružanju usluga",
+    "VrstaDokumenta": "Ugovori"
+  },
+  {
+    "Title": "Ugovor o sponzorstvu",
+    "VrstaDokumenta": "Ugovori"
+  },
+  {
+    "Title": "Raskid ugovora",
+    "VrstaDokumenta": "Ugovori"
+  },
+  {
+    "Title": "Ostalo",
+    "VrstaDokumenta": "Ugovori"
+  },
+  {
+    "Title": "Osnivački akt",
+    "VrstaDokumenta": "Statusna dokumenta"
+  },
+  {
+    "Title": "Rešenje",
+    "VrstaDokumenta": "Statusna dokumenta"
+  },
+  {
+    "Title": "Pravilnici i akti",
+    "VrstaDokumenta": "Statusna dokumenta"
+  },
+  {
+    "Title": "Sertifikati",
+    "VrstaDokumenta": "Statusna dokumenta"
+  },
+  {
+    "Title": "Ostalo",
+    "VrstaDokumenta": "Statusna dokumenta"
+  },
+  {
+    "Title": "Tužba",
+    "VrstaDokumenta": "Administrativna dokumenta"
+  },
+  {
+    "Title": "Dopisi, Obaveštenja, Podnesci",
+    "VrstaDokumenta": "Administrativna dokumenta"
+  },
+  {
+    "Title": "Odluka",
+    "VrstaDokumenta": "Administrativna dokumenta"
+  },
+  {
+    "Title": "Rešenje, Presuda, Zaključak",
+    "VrstaDokumenta": "Administrativna dokumenta"
+  },
+  {
+    "Title": "Punomoćja, Ovlašćena",
+    "VrstaDokumenta": "Administrativna dokumenta"
+  },
+  {
+    "Title": "Zapisnik",
+    "VrstaDokumenta": "Administrativna dokumenta"
+  },
+  {
+    "Title": "Obrasci, Prijave, Izveštaji",
+    "VrstaDokumenta": "Administrativna dokumenta"
+  },
+  {
+    "Title": "Potvrda",
+    "VrstaDokumenta": "Administrativna dokumenta"
+  },
+  {
+    "Title": "Saglasnost",
+    "VrstaDokumenta": "Administrativna dokumenta"
+  },
+  {
+    "Title": "Ostalo",
+    "VrstaDokumenta": "Administrativna dokumenta"
+  },
+  {
+    "Title": "Ugovor o radu",
+    "VrstaDokumenta": "Radni odnosi"
+  },
+  {
+    "Title": "Dokumentacija uz ugovor o radu",
+    "VrstaDokumenta": "Radni odnosi"
+  },
+  {
+    "Title": "Prestanak radnog odnosa",
+    "VrstaDokumenta": "Radni odnosi"
+  },
+  {
+    "Title": "Aneks ugovora o radu",
+    "VrstaDokumenta": "Radni odnosi"
+  },
+  {
+    "Title": "Godišnji odmori i odsustva",
+    "VrstaDokumenta": "Radni odnosi"
+  },
+  {
+    "Title": "Potvrde za zaposlene",
+    "VrstaDokumenta": "Radni odnosi"
+  },
+  {
+    "Title": "Novčane kazne i opomene",
+    "VrstaDokumenta": "Radni odnosi"
+  },
+  {
+    "Title": "Ostala radno - pravna dokumenta",
+    "VrstaDokumenta": "Radni odnosi"
+  },
+  {
+    "Title": "Fakture",
+    "VrstaDokumenta": "Finansije"
+  },
+  {
+    "Title": "Izvodi",
+    "VrstaDokumenta": "Finansije"
+  },
+  {
+    "Title": "Finansijski izveštaji",
+    "VrstaDokumenta": "Finansije"
+  },
+  {
+    "Title": "Ostalo",
+    "VrstaDokumenta": "Finansije"
+  },
+  {
+    "Title": "Avansni račun",
+    "VrstaDokumenta": "Finansije"
+  },
+  {
+    "Title": "Knjižno zaduženje",
+    "VrstaDokumenta": "Finansije"
+  },
+  {
+    "Title": "Knjižno odobrenje",
+    "VrstaDokumenta": "Finansije"
+  },
+  {
+    "Title": "Ostalo",
+    "VrstaDokumenta": "Ostalo"
+  }
+]

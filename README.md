@@ -1,71 +1,39 @@
 # DocCentral V3 / e-Pisarnica
 
-## Status dokumentacije
+## 1. Svrha projekta
 
-Ovaj repozitorijum sadrži poslovnu, tehničku i razvojnu dokumentaciju za novu verziju DocCentral / e-pisarnica rešenja.
+DocCentral V3 je white-label Power Platform rešenje za elektronsku pisarnicu, zavođenje, odobravanje, arhiviranje i upravljanje dokumentima kroz Microsoft 365, Power Apps, Power Automate i SharePoint Online.
 
-Cilj dokumentacije je da bude osnova za:
+Rešenje se prilagođava po klijentu kroz konfiguraciju, šifarnike, App Config, Entra grupe i SharePoint strukturu.
 
-- razvoj nove Power Apps Canvas aplikacije
-- razvoj Power Automate flow-ova
-- definisanje SharePoint data modela
-- pripremu Claude Code development brief-a
-- standardizaciju white-label implementacije po klijentu
-- buduću GitHub dokumentaciju projekta
+## 2. Ključni principi
 
-## Osnovni koncept rešenja
+- SharePoint je primarni data layer.
+- Korisnici u SharePoint-u imaju Read Only pristup.
+- Sve Create/Edit/Delete operacije idu kroz Power Automate pod servisnim nalogom.
+- Canvas aplikacija mora biti responzivna, brza, višejezična i bezbedna.
+- Prava pristupa ne smeju biti samo UI filter u Power Apps-u.
+- Item/folder/file permissions se dodeljuju na SharePoint nivou.
+- Delovodni broj mora biti concurrency-safe.
+- Dva korisnika nikada ne smeju dobiti isti delovodni broj.
+- Audit/logging se implementira preko SharePoint lista.
+- Deployment je ručni import solution-a po tenant-u.
+- Migracija nije u scope-u jer novi klijenti kreću iz praznog okruženja.
 
-DocCentral je white-label e-pisarnica / elektronska evidencija dokumenata koja se prilagođava po klijentu.
+## 3. Glavni poslovni moduli
 
-Rešenje koristi:
+1. Novi predmet / unos novog dokumenta
+2. Rezervisani delovodni brojevi
+3. Dokumenti za odobravanje
+4. Podsetnici
+5. Arhiviranje
+6. Zaključenje godine
+7. Partneri
+8. Administracija šifarnika i konfiguracija
+9. Audit i greške
+10. Arhivska knjiga / PDF generisanje
 
-- Power Apps Canvas aplikaciju kao korisnički interfejs
-- Power Automate kao servisni sloj za upise, prava i poslovnu logiku
-- SharePoint Online liste i biblioteke kao data/storage sloj
-- Microsoft 365 / Entra ID grupe za kontrolu pristupa
-- App Config listu kao centralni izvor šifarnika i konfiguracija
-
-## Ključni arhitektonski princip
-
-Korisnici imaju Read Only prava nad SharePoint sadržajem.
-
-Svi upisi, izmene, dodela prava, generisanje delovodnog broja i sistemske operacije moraju ići kroz Power Automate flow-ove koji rade pod servisnim nalogom.
-
-Aplikacija ne sme da se oslanja samo na UI filtriranje. Backend prava na SharePoint item/folder/file nivou moraju stvarno ograničavati pristup.
-
-## Važni poslovni procesi
-
-### Unos novog dokumenta
-
-Korisnik otvara aplikaciju, bira tip dokumenta, popunjava obavezna polja, dodaje prilog, bira da li koristi rezervisani delovodni broj ili sledeći broj u nizu, zatim klikće `Zavedi`.
-
-Ako se koristi rezervisani broj, korisnik bira datum zavođenja.
-
-Ako se koristi sledeći broj u nizu, datum zavođenja se automatski postavlja na današnji datum.
-
-Sistem validira unos, preuzima ili generiše delovodni broj, kreira SharePoint item, kreira folder/biblioteku za dokument, dodeljuje prava i prikazuje poruku korisniku.
-
-### Arhiviranje
-
-Arhiviranje je posebna funkcionalnost / ekran.
-
-Korisnik može da izlista sve dokumente u statusu `Zavedeno` za tekuću godinu i da ih arhivira sa odgovarajućim arhivskim znacima.
-
-Direktan prelaz iz `Zavedeno` u `Arhivirano` je dozvoljen i to je jedini direktni put arhiviranja.
-
-### Zaključenje godine
-
-Na kraju godine moguće je zaključiti godinu samo ako su ispunjeni svi uslovi:
-
-- svi dokumenti iz tekuće godine su u statusu `Arhivirano`
-- ne postoji nijedan dokument u drugom statusu
-- lista rezervisanih brojeva je prazna
-- kreira se nova delovodna knjiga za sledeću godinu
-- aktivna godina se menja u App Config
-
-Zaključana godina se nikada ne može ponovo otključati.
-
-## Statusi dokumenata
+## 4. Statusi dokumenata
 
 Osnovni statusi su:
 
@@ -75,45 +43,83 @@ Osnovni statusi su:
 - Odbijeno
 - Arhivirano
 
-Kroz `ProcesConfig` klijent može definisati i dodatne / prilagođene statuse.
+Napomena: kroz ProcesConfig klijent može definisati dodatne ili prilagođene statuse, ali osnovni statusi predstavljaju bazni model.
 
-## Approval proces
+## 5. Proces: Unos novog dokumenta
 
-Dokument ide na odobrenje jednom korisniku u jednom koraku.
+1. Korisnik otvara aplikaciju.
+2. Korisnik bira tip dokumenta.
+3. Korisnik popunjava obavezna polja.
+4. Korisnik dodaje prilog.
+5. Korisnik bira da li koristi rezervisani delovodni broj ili generiše sledeći broj u nizu.
+6. Ako koristi rezervisani broj, bira datum zavođenja.
+7. Ako koristi aktuelni/sledeći broj, datum zavođenja se automatski postavlja na današnji datum.
+8. Korisnik klikće "Zavedi".
+9. Sistem proverava validaciju.
+10. Sistem preuzima ili generiše delovodni broj.
+11. Ako broj nije rezervisan, sistem povećava brojač za sledeće zavođenje.
+12. Ako je broj rezervisan, sistem nakon uspešnog zavođenja briše broj iz liste rezervisanih brojeva.
+13. Sistem kreira SharePoint item.
+14. Sistem kreira folder/biblioteku za dokument.
+15. Sistem dodeljuje prava.
+16. Sistem prikazuje poruku korisniku.
 
-Ako ima više korisnika, odobravanje je sekvencijalno.
+## 6. Šta aplikacija ne radi
 
-Postoji mogućnost slanja koraka na grupu. Tada više korisnika dobija obaveštenje, ali prvi korisnik koji odobri završava taj status / korak.
+- Ne postoji Dashboard.
+- Ne postoji ekran "Svi predmeti" u aplikaciji.
+- Ne postoji pregled/listanje svih dokumenata u aplikaciji.
+- Dokumenti se gledaju direktno u SharePoint listama.
+- "Novi predmet" je forma za unos, ne pregled dokumenata.
+- SAP import se ignoriše u ovoj fazi dokumentacije i nove verzije.
+
+## 7. Dokumenti u procesu / odobravanje
+
+U aplikaciji korisnik vidi dokumente koje nije odobrio.
+
+U SharePoint listi korisnik vidi dokumente koji su za njega ili dokumente gde je on ili njegova grupa učestvovala u procesu odobravanja.
 
 Odobrenje menja status dokumenta kroz polje `Stanje`.
 
-Ako je dokument odbijen, dobija status `Odbijeno`, vraća se inicijatoru i inicijator može ponovo pokrenuti approval nakon izmene dokumenta ili metadata polja.
+Proces može biti:
 
-## Ekrani aplikacije
+- sekvencijalan po korisnicima
+- usmeren na grupu, gde više korisnika dobija informaciju, ali prvi koji odobri završava taj korak
 
-U aplikaciji ne postoji Dashboard.
+Ako korisnik odbije dokument:
 
-U aplikaciji ne postoji ekran `Svi predmeti` za pregled svih dokumenata.
+- dokument dobija status `Odbijeno`
+- vraća se inicijatoru
+- inicijator može izmeniti dokument ili metadata
+- inicijator pokreće novi proces odobravanja
 
-Dokumenti se pregledaju direktno u SharePoint listama.
+## 8. Arhiviranje
 
-`Novi predmet` je forma za unos novog dokumenta.
+Arhiviranje je posebna i bitna funkcionalnost.
 
-Aplikacija treba da sadrži funkcionalnosti za:
+Korisnik može da izlista dokumente koji su u statusu `Zavedeno` za tekuću godinu i da ih arhivira uz odgovarajuće arhivske znake.
 
-- unos novog dokumenta
-- arhiviranje
-- zaključenje godine
-- podsetnike
-- dokumente koje korisnik treba da odobri
-- administraciju šifarnika
-- partnere kao posebnu stavku menija
+Direktan prelaz iz `Zavedeno` u `Arhivirano` je dozvoljen i predstavlja jedinu direktnu putanju arhiviranja.
 
-Finalni broj ekrana, nazive ekrana i kontrole treba da odredi Claude Code na osnovu funkcionalnih zahteva i standarda iz ovog repozitorijuma.
+PDF generisanje u prvoj verziji ulazi samo za Arhivsku knjigu.
 
-## Partneri
+## 9. Zaključenje godine
 
-Partneri nisu deo Administracije, već posebna stavka u meniju.
+Na kraju godine korisnik može da zaključi godinu.
+
+Uslovi:
+
+- svi dokumenti iz tekuće godine moraju biti u statusu `Arhivirano`
+- ne sme postojati dokument u bilo kom drugom statusu
+- lista rezervisanih brojeva mora biti prazna
+- kreira se nova delovodna knjiga za sledeću godinu
+- aktivna godina se menja u App Config
+- zaključana godina se nikada ne može ponovo otključati
+- nije potrebna dodatna potvrda administratora
+
+## 10. Partneri
+
+Lista Partneri nije deo Administracije, već je zasebna stavka u meniju.
 
 Korisnik koji zavodi dokumente može da:
 
@@ -122,90 +128,126 @@ Korisnik koji zavodi dokumente može da:
 - briše partnera
 - pregleda partnera
 
-Brisanje partnera ne sme uticati na istorijske dokumente u `Svi predmeti`.
+Brisanje partnera ne sme uticati na istorijske dokumente u listi Svi predmeti. Ranije uneti dokumenti moraju zadržati istoriju partnera.
 
-Obrisani partner ne sme biti dostupan za izbor u novim dokumentima.
+Obrisani partner više ne sme biti dostupan za izbor kod novih dokumenata.
 
-## Rezervisani delovodni brojevi
+## 11. Rezervisani brojevi
 
-Korisnik koji zavodi dokumente može da kreira i koristi rezervisane brojeve.
+Rezervisane brojeve mogu kreirati korisnici koji zavode dokumente.
 
-Rezervisani broj:
+Pravila:
 
-- važi samo za jednu godinu
-- može se koristiti za bilo koji tip dokumenta
-- vide ga svi korisnici koji imaju pravo zavođenja
-- može se izmeniti nakon kreiranja
-- ne može se ručno obrisati nakon rezervacije
-- briše se automatski kada se iskoristi
+- rezervisani broj može da važi samo za jednu godinu
+- rezervisani broj može da se iskoristi za bilo koji tip dokumenta
+- svi korisnici koji zavode dokumente vide sve rezervisane brojeve
+- rezervisani broj može da se izmeni
+- nakon rezervacije ne može se ručno obrisati
+- briše se automatski tek kada se iskoristi za zavođenje
+- lista rezervisanih brojeva mora biti prazna pre zaključenja godine
 
-## Podsetnici
+## 12. Podsetnici
 
-Korisnik može kreirati podsetnik za sebe ili za jednog / više drugih korisnika.
+Korisnik može kreirati podsetnik za sebe ili za jednog ili više drugih korisnika.
 
-Podsetnik se šalje emailom jednom, na datum podsetnika, u 08:00 ujutro ili prema sistemskoj konfiguraciji.
+Podsetnik:
 
-Korisnik ne definiše individualno vreme podsetnika.
+- može biti vezan za dokument/predmet
+- šalje email samo jednom
+- nema status Aktivan/Poslat/Otkazan
+- korisnik može da menja ili briše podsetnik
+- email se šalje na dan podsetnika u 08:00
+- termin slanja je sistemski konfigurisan, korisnik ne definiše pojedinačno vreme
 
-Korisnik može menjati i brisati podsetnike.
+## 13. Administracija
 
-Ne postoji status podsetnika kao `Aktivan`, `Poslat` ili `Otkazan`, osim ako se naknadno uvede kao tehničko poboljšanje.
+Administracija prikazuje šifarnike i konfiguracije.
 
-## Logging i audit
+Funkcionalnosti:
 
-Potrebna je sistemska log lista.
+- pregled šifarnika
+- ručno editovanje pojedinačnih šifarnika
+- export pojedinačnog šifarnika u Excel
+- export svih šifarnika odjednom u Excel
+
+Partneri nisu deo Administracije.
+
+## 14. Security model
+
+Poznato:
+
+- korisnici imaju Read Only prava nad SharePoint-om
+- upisi idu kroz Power Automate
+- Power Automate radi pod servisnim nalogom
+- pristup dokumentima zavisi od grupa i organizacionih jedinica
+- Entra grupa mapping mora biti konfigurabilan po klijentu
+- item/folder/file permissions koriste break inheritance
+- servisni nalog ima RW
+- owner ima RW
+- member/viewer imaju Read
+- ne postoji posebna admin grupa
+- pristup se kontroliše i u Canvas aplikaciji i u SharePoint-u
+- backend permissions moraju skrivati file/item, ne samo UI
+
+## 15. Audit / logging
+
+Audit se implementira kroz SharePoint liste.
 
 Obavezno logovati:
 
 - neuspešno kreiranje dokumenta
-- neuspešan pokušaj generisanja delovodnog broja
-- uspešno generisan delovodni broj
+- pokušaj generisanja delovodnog broja
+- uspešno generisanje delovodnog broja
 - neuspešno generisanje broja
 - korišćenje rezervisanog broja
 - arhiviranje
 - zaključenje godine
 - grešku Power Automate flow-a
 
-## Code quality standard
+## 16. Tehnički standardi
 
-Nova aplikacija mora poštovati sledeće standarde:
+Canvas app mora poštovati sledeće standarde:
 
 - responsive design
-- čist App Checker
+- clean App Checker
 - formula-level error management
-- `IfError` oko Patch / Flow poziva
-- `gbl`, `loc`, `col` naming konvencije
+- IfError oko Patch/Flow poziva
+- gbl/loc/col naming
 - delegabilne formule
 - bez live search query-ja na svaki karakter
-- bez cross-screen referenciranja kontrola
+- bez cross-screen control reference
 - bez nested galleries osim ako je opravdano
+- standard konektori osim ako korisnik izričito kaže drugačije
+- Create/Edit/Delete preko Power Automate
+- Read operacije mogu koristiti SharePoint/Office 365/Groups/Microsoft 365 podatke prema potrebi
 
-## Struktura repozitorijuma
+## 17. Uloga Claude Code-a
 
-```text
-.
-├── README.md
-├── architecture/
-├── business/
-├── checklists/
-├── claude-code/
-├── data-model/
-├── processes/
-├── security/
-├── skills/
-└── templates/
-```
+Claude Code treba da koristi ovaj repository kao osnovu za:
 
-## Sporno / nepoznato
+- razumevanje business procesa
+- projektovanje nove Canvas aplikacije
+- pisanje tehničke dokumentacije
+- predlog strukture ekrana
+- implementaciju responsive UX-a
+- definisanje Power Automate flow-ova
+- definisanje SharePoint lista
+- definisanje security modela
+- definisanje test matrice
+- generisanje development brief-a
 
-Sledeće stavke ostaju otvorene ili se čitaju iz solution exporta:
+Claude Code može sam odlučiti:
 
-- formule iz Canvas aplikacije
-- kompletan inventar flow-ova
-- connection references
-- environment variables
-- detaljna App Config upotreba po ekranima
-- konačan deployment model po tenantima
-- konačna mapa Entra grupa po klijentu
-- detaljan PDF generation mehanizam
-- migration strategija za postojeće produkcione podatke
+- finalni vizuelni dizajn
+- finalni broj ekrana
+- nazive ekrana
+- raspored kontrola
+- UX detalje, ako nisu u konfliktu sa business pravilima
+
+Claude Code ne sme menjati:
+
+- concurrency-safe zahtev za delovodni broj
+- pravilo da zaključana godina ne može biti otključana
+- pravilo da korisnici nemaju direktan Write u SharePoint
+- pravilo da Create/Edit/Delete ide preko Power Automate
+- pravilo da backend permissions moraju stvarno ograničavati pristup dokumentima

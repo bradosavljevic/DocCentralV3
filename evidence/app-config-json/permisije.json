@@ -1,0 +1,20 @@
+[
+  {
+    "DocumentCategory": "Finansije",
+    "DocumentType": "Avansni račun",
+    "Group": "Lazar Magovčević",
+    "GroupEmail": "test@test.com",
+    "InputOutput": "Ulazni",
+    "OrganizationalUnit": "Administration",
+    "Title": "3ac780fb-987b-442b-b783-ccdd5abcad2a"
+  },
+  {
+    "DocumentCategory": "Administrativna dokumenta",
+    "DocumentType": "Dopisi, Obaveštenja, Podnesci",
+    "Group": "Zoli Playground Members",
+    "GroupEmail": "test@test.com",
+    "InputOutput": "Ulazni",
+    "OrganizationalUnit": "Administration",
+    "Title": "56c50b70-76d0-494d-bc16-9c5da7e58746"
+  }
+]

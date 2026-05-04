@@ -1,0 +1,42 @@
+[
+  {
+    "Naziv dokumenta": "Fakture",
+    "Šifra dokumenta": "380",
+    "Vrsta dokumenta": "Finansije",
+    "Tip dokumenta": "Fakture",
+    "Delovodnik": "Osnovni delovodnik",
+    "AK grupa kategorije": "Finansijsko-materijalno poslovanje",
+    "AK Kategorija": "Knjiga ulaznih računa",
+    "AK Klasifikaciona oznaka": "VIII-110"
+  },
+  {
+    "Naziv dokumenta": "Avansni račun",
+    "Šifra dokumenta": "386",
+    "Vrsta dokumenta": "Finansije",
+    "Tip dokumenta": "Avansni račun",
+    "Delovodnik": "Osnovni delovodnik",
+    "AK grupa kategorije": "Finansijsko-materijalno poslovanje",
+    "AK Kategorija": "Avansi",
+    "AK Klasifikaciona oznaka": "VIII-184"
+  },
+  {
+    "Naziv dokumenta": "Knjižno odobrenje",
+    "Šifra dokumenta": "381",
+    "Vrsta dokumenta": "Finansije",
+    "Tip dokumenta": "Knjižno odobrenje",
+    "Delovodnik": "Osnovni delovodnik",
+    "AK grupa kategorije": "Finansijsko-materijalno poslovanje",
+    "AK Kategorija": "Knjižna pisma",
+    "AK Klasifikaciona oznaka": "VIII-183"
+  },
+  {
+    "Naziv dokumenta": "Knjižno zaduženje",
+    "Šifra dokumenta": "383",
+    "Vrsta dokumenta": "Finansije",
+    "Tip dokumenta": "Knjižno zaduženje",
+    "Delovodnik": "Osnovni delovodnik",
+    "AK grupa kategorije": "Finansijsko-materijalno poslovanje",
+    "AK Kategorija": "Knjižna pisma",
+    "AK Klasifikaciona oznaka": "VIII-183"
+  }
+]

@@ -1,20 +1,53 @@
-# Data Model — Partneri
+# SharePoint lista: Partneri
 
-## Status
+## Svrha
 
-```text
-DOPUNJENO POSTOJEĆOM DOKUMENTACIJOM I SOLUTION NALAZIMA
-```
+Lista poslovnih partnera koji se koriste kod zavođenja dokumenata.
 
-## Dopuna
+Partneri su zasebna stavka u meniju i nisu deo Administracije.
 
-Povezani elementi: `scrPartneri`, `CF_DocCentral21_AddPartner`, `CF_DocCentral21_GetPartners`, `gpdoccen_EV_DocCentral21_lstPartneri`. Ako se partner proverava po PIB-u, PIB treba indeksirati i definisati deduplikaciju.
+## Funkcionalnosti
 
-## Povezani dokumenti
+Korisnik koji zavodi dokumente može da:
 
-```text
-README.md
-docs/04-sharepoint-data-model.md
-power-automate/flow-inventory.md
-configuration/environment-variables.md
-```
+- kreira partnera
+- menja partnera
+- briše partnera
+- pregleda partnera
+
+## Očekivana polja
+
+Tačna interna imena proveriti iz XML/solution exporta.
+
+Očekivana polja:
+
+- ID
+- Title
+- PoslovnoIme
+- PIB
+- MB
+- Mesto
+- Adresa
+- Email
+- Telefon
+- IsActive
+- Created
+- Modified
+- Author
+- Editor
+
+## Pravilo istorije
+
+Brisanje partnera ne sme uticati na istorijske dokumente.
+
+Dokumenti u listi Svi predmeti moraju zadržati partner history.
+
+Preporuka:
+
+- u dokument upisati denormalizovane partner podatke
+- koristiti soft delete kada je moguće
+- ne dozvoliti izbor obrisanog/deaktiviranog partnera za novi dokument
+
+## Logging
+
+Logovati neuspešne operacije nad partnerima.

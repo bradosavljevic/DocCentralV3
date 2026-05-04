@@ -1,20 +1,70 @@
-# Data Model — Svi predmeti
+# SharePoint lista: Svi predmeti
 
-## Status
+## Svrha
 
-```text
-DOPUNJENO POSTOJEĆOM DOKUMENTACIJOM I SOLUTION NALAZIMA
-```
+Centralna lista za registrovane dokumente/predmete.
 
-## Dopuna
+Dokumenti se gledaju direktno u SharePoint listama, ne kroz aplikacijski dashboard.
 
-Lista je centralni registry entitet. Povezana environment variable: `pbmlv2_EV_DocCentral21_lstSviPredmeti`. `DelovodniBroj` mora biti tretiran kao unique poslovni identifikator.
+## Ključna polja
 
-## Povezani dokumenti
+Napomena: tačna interna imena kolona treba uzeti iz XML/solution exporta. Često su interna imena jednaka display name-u bez razmaka.
 
-```text
-README.md
-docs/04-sharepoint-data-model.md
-power-automate/flow-inventory.md
-configuration/environment-variables.md
-```
+Očekivana ključna polja:
+
+- ID
+- Title
+- DelovodniBroj
+- TipDokumenta
+- Stanje
+- DatumZavodjenja
+- Godina
+- Partner
+- PartnerNaziv
+- PartnerPIB
+- Inicijator
+- Odobrava
+- DodatniPrimaoci
+- OrganizacioneJedinice
+- LinkDoDokumenta
+- ArhivskiZnak
+- DatumArhiviranja
+- Created
+- Modified
+- Author
+- Editor
+
+## Statusi
+
+Osnovni statusi:
+
+- Zavedeno
+- U odobravanju
+- Odobreno
+- Odbijeno
+- Arhivirano
+
+Kroz ProcesConfig mogu postojati dodatni statusi.
+
+## Pravila
+
+- `DelovodniBroj` mora biti unikatan.
+- Dokument mora zadržati istoriju partnera čak i ako partner bude obrisan ili deaktiviran.
+- Korisnici vide samo dokumente za koje imaju SharePoint permissions.
+- Backend permissions su obavezni.
+- UI filtriranje nije dovoljno.
+
+## Permission model
+
+Item/folder/file permissions se dodeljuju kroz break inheritance.
+
+- service account: RW
+- owners: RW
+- members/viewers: Read
+- relevantni korisnici/grupe: Read
+
+## Napomena za Claude Code
+
+Ne pretpostavljati da postoji ekran "Svi predmeti" u Canvas aplikaciji.
+
+Svi predmeti je SharePoint lista, ne aplikacijski modul za pregled svih dokumenata.

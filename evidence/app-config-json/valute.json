@@ -1,0 +1,42 @@
+[
+  {
+    "Title": "RSD",
+    "Treshold": "150,000.00"
+  },
+  {
+    "Title": "USD",
+    "Treshold": "0.00"
+  },
+  {
+    "Title": "EUR",
+    "Treshold": "1,500.00"
+  },
+  {
+    "Title": "SEK",
+    "Treshold": "0.00"
+  },
+  {
+    "Title": "PLN",
+    "Treshold": "0.00"
+  },
+  {
+    "Title": "CHF",
+    "Treshold": "0.00"
+  },
+  {
+    "Title": "JPN",
+    "Treshold": "0.00"
+  },
+  {
+    "Title": "GBP",
+    "Treshold": "0.00"
+  },
+  {
+    "Title": "JPY ",
+    "Treshold": "0.00"
+  },
+  {
+    "Title": "INR",
+    "Treshold": "0.00"
+  }
+]

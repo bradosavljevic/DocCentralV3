@@ -1,12 +1,29 @@
-# Claude Code instructions
+# Claude Code instrukcije
 
-Claude Code mora koristiti ovu dokumentaciju kao izvor istine.
+Ovaj folder sadrži uputstva za Claude Code.
 
-## Pravila
+## Redosled čitanja
 
-- Ne izmišljati liste, kolone, flow-ove, ekrane i connection reference.
-- Svaku nepoznanicu označiti kao `NEPOZNATO`.
-- Svaku preporuku označiti kao `PREPORUKA`.
-- Create/Edit/Delete voditi kroz Power Automate backend.
-- Korisnike tretirati kao SharePoint Read Only.
-- Delovodni broj tretirati kao enterprise-critical concurrency problem.
+1. `/README.md`
+2. `/templates/claude-code-development-brief.md`
+3. `/prompts/master-claude-code-prompt.md`
+4. `/skills/*.md`
+5. `/business/*.md`
+6. `/architecture/*.md`
+7. `/data-model/*.md`
+8. `/power-apps/*.md`
+9. `/power-automate/*.md`
+10. `/security/*.md`
+11. `/testing/test-matrix.md`
+
+## Glavna pravila
+
+- Ne praviti Dashboard.
+- Ne praviti ekran Svi predmeti.
+- Dokumenti se gledaju u SharePoint listama.
+- Create/Edit/Delete kroz Power Automate.
+- Delovodni broj mora biti concurrency-safe.
+- Korisnici imaju SharePoint Read Only.
+- Backend permissions su obavezne.
+- Zaključana godina se ne može otključati.
+- App Config je konfiguracioni layer.

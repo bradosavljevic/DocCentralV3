@@ -1,0 +1,967 @@
+[
+  {
+    "Title": "MyReminders",
+    "Lang": "en",
+    "Value": "My Reminders"
+  },
+  {
+    "Title": "MyReminders",
+    "Lang": "rs",
+    "Value": "Moji podsetnici"
+  },
+  {
+    "Title": "Subject",
+    "Lang": "en",
+    "Value": "Subject"
+  },
+  {
+    "Title": "Subject",
+    "Lang": "rs",
+    "Value": "Predmet"
+  },
+  {
+    "Title": "WorkBook",
+    "Lang": "en",
+    "Value": "Workbook"
+  },
+  {
+    "Title": "WorkBook",
+    "Lang": "rs",
+    "Value": "Delovodnik"
+  },
+  {
+    "Title": "Comment",
+    "Lang": "en",
+    "Value": "Comment"
+  },
+  {
+    "Title": "Comment",
+    "Lang": "rs",
+    "Value": "Komentar"
+  },
+  {
+    "Title": "Date",
+    "Lang": "en",
+    "Value": "Date"
+  },
+  {
+    "Title": "Date",
+    "Lang": "rs",
+    "Value": "Datum"
+  },
+  {
+    "Title": "MyProcesses",
+    "Lang": "en",
+    "Value": "My Processes"
+  },
+  {
+    "Title": "MyProcesses",
+    "Lang": "rs",
+    "Value": "Moji procesi"
+  },
+  {
+    "Title": "DocumentCategory",
+    "Lang": "en",
+    "Value": "Document category"
+  },
+  {
+    "Title": "DocumentCategory",
+    "Lang": "rs",
+    "Value": "Kategorija dokumenta"
+  },
+  {
+    "Title": "DocumentType",
+    "Lang": "en",
+    "Value": "Document type"
+  },
+  {
+    "Title": "DocumentType",
+    "Lang": "rs",
+    "Value": "Tip dokumenta"
+  },
+  {
+    "Title": "State",
+    "Lang": "en",
+    "Value": "State"
+  },
+  {
+    "Title": "State",
+    "Lang": "rs",
+    "Value": "Stanje"
+  },
+  {
+    "Title": "WaitingRoom",
+    "Lang": "en",
+    "Value": "Waiting room"
+  },
+  {
+    "Title": "WaitingRoom",
+    "Lang": "rs",
+    "Value": "Čekaonica"
+  },
+  {
+    "Title": "RegistryDate",
+    "Lang": "en",
+    "Value": "Registry date"
+  },
+  {
+    "Title": "RegistryDate",
+    "Lang": "rs",
+    "Value": "Datum zavođenja"
+  },
+  {
+    "Title": "InputOutput",
+    "Lang": "en",
+    "Value": "Input/Output"
+  },
+  {
+    "Title": "InputOutput",
+    "Lang": "rs",
+    "Value": "Ulazni/Izlazni"
+  },
+  {
+    "Title": "OrganizationalUnit",
+    "Lang": "en",
+    "Value": "Organizational unit"
+  },
+  {
+    "Title": "OrganizationalUnit",
+    "Lang": "rs",
+    "Value": "Organizaciona jedinica"
+  },
+  {
+    "Title": "Partner",
+    "Lang": "en",
+    "Value": "Partner"
+  },
+  {
+    "Title": "Partner",
+    "Lang": "rs",
+    "Value": "Partner"
+  },
+  {
+    "Title": "ProcurementNumber",
+    "Lang": "en",
+    "Value": "Procurement number"
+  },
+  {
+    "Title": "ProcurementNumber",
+    "Lang": "rs",
+    "Value": "Broj nabavke"
+  },
+  {
+    "Title": "InvoiceSubjectNumber",
+    "Lang": "en",
+    "Value": "Ext. Invoice number"
+  },
+  {
+    "Title": "InvoiceSubjectNumber",
+    "Lang": "rs",
+    "Value": "Eksterni broj fakture"
+  },
+  {
+    "Title": "ResponsiblePerson",
+    "Lang": "en",
+    "Value": "Responsible person"
+  },
+  {
+    "Title": "ResponsiblePerson",
+    "Lang": "rs",
+    "Value": "Zadužena osoba"
+  },
+  {
+    "Title": "UseReservedNumber",
+    "Lang": "en",
+    "Value": "Use reserved number "
+  },
+  {
+    "Title": "UseReservedNumber",
+    "Lang": "rs",
+    "Value": "Korisiti rezervisani broj"
+  },
+  {
+    "Title": "Yes",
+    "Lang": "en",
+    "Value": "Yes"
+  },
+  {
+    "Title": "Yes",
+    "Lang": "rs",
+    "Value": "Da"
+  },
+  {
+    "Title": "No",
+    "Lang": "en",
+    "Value": "No"
+  },
+  {
+    "Title": "No",
+    "Lang": "rs",
+    "Value": "Ne"
+  },
+  {
+    "Title": "SelectReservedNumber",
+    "Lang": "en",
+    "Value": "Select reserved number"
+  },
+  {
+    "Title": "SelectReservedNumber",
+    "Lang": "rs",
+    "Value": "Odaberi rezervisani broj"
+  },
+  {
+    "Title": "CurrencyPayments",
+    "Lang": "en",
+    "Value": "Currency payments"
+  },
+  {
+    "Title": "CurrencyPayments",
+    "Lang": "rs",
+    "Value": "Valuta plaćanja"
+  },
+  {
+    "Title": "ExpiryDate",
+    "Lang": "en",
+    "Value": "Expiry date"
+  },
+  {
+    "Title": "ExpiryDate",
+    "Lang": "rs",
+    "Value": "Datum isteka"
+  },
+  {
+    "Title": "InvoiceValue",
+    "Lang": "en",
+    "Value": "Invoice Value"
+  },
+  {
+    "Title": "InvoiceValue",
+    "Lang": "rs",
+    "Value": "Vrednost fakture"
+  },
+  {
+    "Title": "Currency",
+    "Lang": "en",
+    "Value": "Currency"
+  },
+  {
+    "Title": "Currency",
+    "Lang": "rs",
+    "Value": "Valuta"
+  },
+  {
+    "Title": "EffectiveDate",
+    "Lang": "en",
+    "Value": "Effective date"
+  },
+  {
+    "Title": "EffectiveDate",
+    "Lang": "rs",
+    "Value": "Datum stupanja na snagu"
+  },
+  {
+    "Title": "Back",
+    "Lang": "en",
+    "Value": "Back"
+  },
+  {
+    "Title": "Back",
+    "Lang": "rs",
+    "Value": "Nazad"
+  },
+  {
+    "Title": "AddReminder",
+    "Lang": "en",
+    "Value": "Add reminder"
+  },
+  {
+    "Title": "AddReminder",
+    "Lang": "rs",
+    "Value": "Dodaj podsetnik"
+  },
+  {
+    "Title": "AddDocument",
+    "Lang": "en",
+    "Value": "Add document"
+  },
+  {
+    "Title": "AddDocument",
+    "Lang": "rs",
+    "Value": "Dodaj dokument"
+  },
+  {
+    "Title": "HowManyNumbersYouWantToReserve",
+    "Lang": "en",
+    "Value": "How many numbers you want to reserve?"
+  },
+  {
+    "Title": "HowManyNumbersYouWantToReserve",
+    "Lang": "rs",
+    "Value": "Koliko brojeva želite rezervisati?"
+  },
+  {
+    "Title": "Reserve",
+    "Lang": "en",
+    "Value": "Reserve"
+  },
+  {
+    "Title": "Reserve",
+    "Lang": "rs",
+    "Value": "Rezerviši"
+  },
+  {
+    "Title": "ReservedWorkBooknumber",
+    "Lang": "en",
+    "Value": "Reserved workbook number"
+  },
+  {
+    "Title": "ReservedWorkBooknumber",
+    "Lang": "rs",
+    "Value": "Rezervisani delovodni broj"
+  },
+  {
+    "Title": "ReservedNumber",
+    "Lang": "en",
+    "Value": "Reserved number"
+  },
+  {
+    "Title": "ReservedNumber",
+    "Lang": "rs",
+    "Value": "Rezervisani broj"
+  },
+  {
+    "Title": "ReservationDate",
+    "Lang": "en",
+    "Value": "Reservation date"
+  },
+  {
+    "Title": "ReservationDate",
+    "Lang": "rs",
+    "Value": "Datum rezervacije"
+  },
+  {
+    "Title": "DateForReminder",
+    "Lang": "en",
+    "Value": "Date for reminder"
+  },
+  {
+    "Title": "DateForReminder",
+    "Lang": "rs",
+    "Value": "Datum podsetnika"
+  },
+  {
+    "Title": "SaveReminder",
+    "Lang": "en",
+    "Value": "Save reminder"
+  },
+  {
+    "Title": "SaveReminder",
+    "Lang": "rs",
+    "Value": "Sačuvaj podsetnik"
+  },
+  {
+    "Title": "DeleteReminder",
+    "Lang": "en",
+    "Value": "Delete reminder"
+  },
+  {
+    "Title": "DeleteReminder",
+    "Lang": "rs",
+    "Value": "Obriši podsetnik"
+  },
+  {
+    "Title": "Archiving",
+    "Lang": "en",
+    "Value": "Archiving"
+  },
+  {
+    "Title": "Archiving",
+    "Lang": "rs",
+    "Value": "Arhiviranje"
+  },
+  {
+    "Title": "Enter documentation",
+    "Lang": "en",
+    "Value": "Enter documentation"
+  },
+  {
+    "Title": "Enter documentation",
+    "Lang": "rs",
+    "Value": "Unos dokumenta"
+  },
+  {
+    "Title": "Documentation search",
+    "Lang": "en",
+    "Value": "Documentation search..."
+  },
+  {
+    "Title": "Documentation search",
+    "Lang": "rs",
+    "Value": "Pretraga dokumenata..."
+  },
+  {
+    "Title": "Document number reservation",
+    "Lang": "en",
+    "Value": "Document number reservation"
+  },
+  {
+    "Title": "Document number reservation",
+    "Lang": "rs",
+    "Value": "Rezervacija delovodnog broja"
+  },
+  {
+    "Title": "E-Workbook",
+    "Lang": "en",
+    "Value": "E-Workbook"
+  },
+  {
+    "Title": "E-Workbook",
+    "Lang": "rs",
+    "Value": "Delovodnik"
+  },
+  {
+    "Title": "DocumentSwap",
+    "Lang": "en",
+    "Value": "Document swap"
+  },
+  {
+    "Title": "DocumentSwap",
+    "Lang": "rs",
+    "Value": "Zamena dokumenta"
+  },
+  {
+    "Title": "NazivDokumenta",
+    "Lang": "en",
+    "Value": "Document name"
+  },
+  {
+    "Title": "NazivDokumenta",
+    "Lang": "rs",
+    "Value": "Naziv dokumenta"
+  },
+  {
+    "Title": "RegistryNumber",
+    "Lang": "en",
+    "Value": "Registry number"
+  },
+  {
+    "Title": "RegistryNumber",
+    "Lang": "rs",
+    "Value": "Delovodni broj"
+  },
+  {
+    "Title": "NewDocument",
+    "Lang": "en",
+    "Value": "New document"
+  },
+  {
+    "Title": "NewDocument",
+    "Lang": "rs",
+    "Value": "Novi dokument"
+  },
+  {
+    "Title": "Save",
+    "Lang": "en",
+    "Value": "Save"
+  },
+  {
+    "Title": "Save",
+    "Lang": "rs",
+    "Value": "Sačuvaj"
+  },
+  {
+    "Title": "Edit",
+    "Lang": "en",
+    "Value": "Edit"
+  },
+  {
+    "Title": "Edit",
+    "Lang": "rs",
+    "Value": "Uredi"
+  },
+  {
+    "Title": "Cancel",
+    "Lang": "en",
+    "Value": "Cancel"
+  },
+  {
+    "Title": "Cancel",
+    "Lang": "rs",
+    "Value": "Otkaži"
+  },
+  {
+    "Title": "Error1",
+    "Lang": "en",
+    "Value": "You have not uploaded a file or selected a reference number."
+  },
+  {
+    "Title": "Error1",
+    "Lang": "rs",
+    "Value": "Niste uneli datoteku ili odabrali delovodni broj"
+  },
+  {
+    "Title": "Person",
+    "Lang": "en",
+    "Value": "Person"
+  },
+  {
+    "Title": "Person",
+    "Lang": "rs",
+    "Value": "Osoba"
+  },
+  {
+    "Title": "NoDoc",
+    "Lang": "en",
+    "Value": "No document has been entered."
+  },
+  {
+    "Title": "NoDoc",
+    "Lang": "rs",
+    "Value": "Nije unet dokument"
+  },
+  {
+    "Title": "Registrynumber",
+    "Lang": "en",
+    "Value": "Registry number"
+  },
+  {
+    "Title": "Registrynumber",
+    "Lang": "rs",
+    "Value": "Delovodni broj"
+  },
+  {
+    "Title": "DocumentType",
+    "Lang": "en",
+    "Value": "Document Type"
+  },
+  {
+    "Title": "DocumentType",
+    "Lang": "rs",
+    "Value": "Vrsta dokumenta"
+  },
+  {
+    "Title": "ArchivalRegisterCategoryGroup",
+    "Lang": "en",
+    "Value": "Archival register category group"
+  },
+  {
+    "Title": "ArchivalRegisterCategoryGroup",
+    "Lang": "rs",
+    "Value": "Arhivska knjiga grupa kategorija"
+  },
+  {
+    "Title": "ArchivalRegisterGroup",
+    "Lang": "en",
+    "Value": "Archival register group"
+  },
+  {
+    "Title": "ArchivalRegisterGroup",
+    "Lang": "rs",
+    "Value": "Arhivska knjiga kategorija"
+  },
+  {
+    "Title": "LastRegistryUnitNumber",
+    "Lang": "en",
+    "Value": "Last registry unit number"
+  },
+  {
+    "Title": "ArchivalRegisterGroup",
+    "Lang": "rs",
+    "Value": "Poslednji broj registraturne jedinice"
+  },
+  {
+    "Title": "ClassificationMark",
+    "Lang": "en",
+    "Value": "Classification Mark"
+  },
+  {
+    "Title": "ClassificationMark",
+    "Lang": "rs",
+    "Value": "Klasifikaciona oznaka"
+  },
+  {
+    "Title": "Location",
+    "Lang": "en",
+    "Value": "Location"
+  },
+  {
+    "Title": "Location",
+    "Lang": "rs",
+    "Value": "Lokacija"
+  },
+  {
+    "Title": "RegistryUnitType",
+    "Lang": "en",
+    "Value": "Registry unit type"
+  },
+  {
+    "Title": "RegistryUnitType",
+    "Lang": "rs",
+    "Value": "Tip registracione jedinice"
+  },
+  {
+    "Title": "CreateNewRegistryUnit",
+    "Lang": "en",
+    "Value": "Create new registry unit"
+  },
+  {
+    "Title": "CreateNewRegistryUnit",
+    "Lang": "rs",
+    "Value": "Kreiraj novu reg. jedinicu"
+  },
+  {
+    "Title": "LastRegistryUnitNumber",
+    "Lang": "en",
+    "Value": "Last registry unit number"
+  },
+  {
+    "Title": "LastRegistryUnitNumber",
+    "Lang": "rs",
+    "Value": "Poslednji broj registraturne jedinice"
+  },
+  {
+    "Title": "UploadWarning",
+    "Lang": "en",
+    "Value": "Enter the required fields to successfully save the document."
+  },
+  {
+    "Title": "UploadWarning",
+    "Lang": "rs",
+    "Value": "Unesite obavezna polja da biste uspešno sačuvali dokument."
+  },
+  {
+    "Title": "Codes",
+    "Lang": "en",
+    "Value": "Codes"
+  },
+  {
+    "Title": "Codes",
+    "Lang": "rs",
+    "Value": "Sifrarnici"
+  },
+  {
+    "Title": "ArchiveRegister",
+    "Lang": "en",
+    "Value": "Archive Register"
+  },
+  {
+    "Title": "ArchiveRegister",
+    "Lang": "rs",
+    "Value": "Arhivska knjiga"
+  },
+  {
+    "Title": "CreateArchiveRegister",
+    "Lang": "en",
+    "Value": "Create Archive Register"
+  },
+  {
+    "Title": "CreateArchiveRegister",
+    "Lang": "rs",
+    "Value": "Kreiraj Arhivsku knjigu"
+  },
+  {
+    "Title": "CreateArchiveRegisterMsg",
+    "Lang": "en",
+    "Value": "The archive register cannot be created because there are documents that have not been archived."
+  },
+  {
+    "Title": "CreateArchiveRegisterMsg",
+    "Lang": "rs",
+    "Value": "Arhivsku knjigu nije moguće kreirati, jer postoje dokumenti koji nisu arhivirani."
+  },
+  {
+    "Title": "CloseTheRecordsForTheYear",
+    "Lang": "en",
+    "Value": "Close the records for the year"
+  },
+  {
+    "Title": "CloseTheRecordsForTheYear",
+    "Lang": "rs",
+    "Value": "Zaključi godinu"
+  },
+  {
+    "Title": "Partners",
+    "Lang": "en",
+    "Value": "Partners"
+  },
+  {
+    "Title": "Partners",
+    "Lang": "rs",
+    "Value": "Partneri"
+  },
+  {
+    "Title": "EInvoice",
+    "Lang": "en",
+    "Value": "E-invoices"
+  },
+  {
+    "Title": "EInvoice",
+    "Lang": "rs",
+    "Value": "E-fakture"
+  },
+  {
+    "Title": "EDocument",
+    "Lang": "en",
+    "Value": "E-document"
+  },
+  {
+    "Title": "EDocument",
+    "Lang": "rs",
+    "Value": "E-dokument"
+  },
+  {
+    "Title": "EInvoiceID",
+    "Lang": "en",
+    "Value": "Invoice ID"
+  },
+  {
+    "Title": "EInvoiceID",
+    "Lang": "rs",
+    "Value": "E-faktura ID"
+  },
+  {
+    "Title": "Attachments",
+    "Lang": "en",
+    "Value": "Attachments"
+  },
+  {
+    "Title": "Attachments",
+    "Lang": "rs",
+    "Value": "Prilozi"
+  },
+  {
+    "Title": "Accept",
+    "Lang": "en",
+    "Value": "Accept"
+  },
+  {
+    "Title": "Accept",
+    "Lang": "rs",
+    "Value": "Prihvati"
+  },
+  {
+    "Title": "Reject",
+    "Lang": "en",
+    "Value": "Reject"
+  },
+  {
+    "Title": "LockYear",
+    "Lang": "en",
+    "Value": "Lock Year"
+  },
+  {
+    "Title": "LockYear",
+    "Lang": "rs",
+    "Value": "Zaključi godinu"
+  },
+  {
+    "Title": "GetData",
+    "Lang": "en",
+    "Value": "Get Data"
+  },
+  {
+    "Title": "GetData",
+    "Lang": "rs",
+    "Value": "Preuzmi podatke"
+  },
+  {
+    "Title": "Year",
+    "Lang": "en",
+    "Value": "Year"
+  },
+  {
+    "Title": "Year",
+    "Lang": "rs",
+    "Value": "Godina"
+  },
+  {
+    "Title": "ReviewAndRegister",
+    "Lang": "en",
+    "Value": "Review and Register"
+  },
+  {
+    "Title": "ReviewAndRegister",
+    "Lang": "rs",
+    "Value": "Pregledaj i zavedi"
+  },
+  {
+    "Title": "Reject",
+    "Lang": "en",
+    "Value": "Reject"
+  },
+  {
+    "Title": "Reject",
+    "Lang": "rs",
+    "Value": "Odbaci"
+  },
+  {
+    "Title": "AdHocOdobrenje",
+    "Lang": "en",
+    "Value": "AdHoc Approval (One-time Approval)"
+  },
+  {
+    "Title": "AdHocOdobrenje",
+    "Lang": "rs",
+    "Value": "Jednokratno odobravanje (AdHoc odobrenje)"
+  },
+  {
+    "Title": "SelectApprover",
+    "Lang": "en",
+    "Value": "Select approver"
+  },
+  {
+    "Title": "SelectApprover",
+    "Lang": "rs",
+    "Value": "Izaberite odobravaoca"
+  },
+  {
+    "Title": "BusinessUnit",
+    "Lang": "en",
+    "Value": "Business Unit"
+  },
+  {
+    "Title": "BusinessUnit",
+    "Lang": "rs",
+    "Value": "Poslovna jedinica"
+  },
+  {
+    "Title": "CostCenter",
+    "Lang": "en",
+    "Value": "Cost Center"
+  },
+  {
+    "Title": "CostCenter",
+    "Lang": "rs",
+    "Value": "Mesto troška"
+  },
+  {
+    "Title": "Products",
+    "Lang": "en",
+    "Value": "Products"
+  },
+  {
+    "Title": "Products",
+    "Lang": "rs",
+    "Value": "Proizvodi"
+  },
+  {
+    "Title": "AddAttachment",
+    "Lang": "en",
+    "Value": "Add attachment"
+  },
+  {
+    "Title": "AddAttachment",
+    "Lang": "rs",
+    "Value": "Dodaj prilog"
+  },
+  {
+    "Title": "CommentSEF",
+    "Lang": "en",
+    "Value": "Comment from SEF"
+  },
+  {
+    "Title": "CommentSEF",
+    "Lang": "rs",
+    "Value": "Komentar sa SEF-a"
+  },
+  {
+    "Title": "UnprocessedDocuments",
+    "Lang": "en",
+    "Value": "Unprocessed documents"
+  },
+  {
+    "Title": "UnprocessedDocuments",
+    "Lang": "rs",
+    "Value": "Neobrađeni dokumenti"
+  },
+  {
+    "Title": "UsersForApproval",
+    "Lang": "en",
+    "Value": "Users for approval"
+  },
+  {
+    "Title": "UsersForApproval",
+    "Lang": "rs",
+    "Value": "Korisnici za odobrenje"
+  },
+  {
+    "Title": "SendForApproval",
+    "Lang": "en",
+    "Value": "Send for approval"
+  },
+  {
+    "Title": "SendForApproval",
+    "Lang": "rs",
+    "Value": "Pošalji na odobrenje"
+  },
+  {
+    "Title": "ContractValue",
+    "Lang": "en",
+    "Value": "Contract value"
+  },
+  {
+    "Title": "ContractValue",
+    "Lang": "rs",
+    "Value": "Vrednost ugovora"
+  },
+  {
+    "Title": "ContractNumber",
+    "Lang": "en",
+    "Value": "Contract number"
+  },
+  {
+    "Title": "ContractNumber",
+    "Lang": "rs",
+    "Value": "Broj ugovora"
+  },
+  {
+    "Title": "DelovodniBroj",
+    "Lang": "en",
+    "Value": "Document registry number"
+  },
+  {
+    "Title": "DelovodniBroj",
+    "Lang": "rs",
+    "Value": "Delovodni broj"
+  },
+  {
+    "Title": "Iznos",
+    "Lang": "en",
+    "Value": "Amount"
+  },
+  {
+    "Title": "Iznos",
+    "Lang": "rs",
+    "Value": "Iznos"
+  },
+  {
+    "Title": "Sender",
+    "Lang": "en",
+    "Value": "Sender"
+  },
+  {
+    "Title": "Sender",
+    "Lang": "rs",
+    "Value": "Pošiljalac"
+  },
+  {
+    "Title": "SenderEmail",
+    "Lang": "en",
+    "Value": "Sender Email"
+  },
+  {
+    "Title": "SenderEmail",
+    "Lang": "rs",
+    "Value": "Email pošiljalaca"
+  },
+  {
+    "Title": "Loading",
+    "Lang": "en",
+    "Value": "Loading..."
+  },
+  {
+    "Title": "Loading",
+    "Lang": "rs",
+    "Value": "Učitavanje..."
+  }
+]
