@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_AssignPermissions_TriggerInput",
+  "title": "CF_DocCentralV3_AssignPermissions — Power Apps V2 Trigger Input Schema",
+  "description": "Input parameters for CF_DocCentralV3_AssignPermissions child flow. Called after document item and files are created (CF_DocCentralV3_CreateDocument), and at each approval step transition (CF_DocCentralV3_SendForApproval, CF_DocCentralV3_ProcessApprovalResponse). Assigns item-level SharePoint permissions by breaking inheritance and granting Read to the configured principals.",
+  "type": "object",
+  "required": [
+    "sviPredmetiItemId",
+    "initiatorEmail"
+  ],
+  "properties": {
+    "sviPredmetiItemId": {
+      "type": "integer",
+      "description": "SharePoint item ID from Svi predmeti. The target item whose role inheritance will be broken and on which explicit permissions will be set.",
+      "minimum": 1,
+      "examples": [42]
+    },
+    "documentLibraryFileIds": {
+      "type": "string",
+      "description": "JSON array string of SharePoint file item IDs in the Dokumenti library to receive the same permissions. Pass '[]' if no file-level permissions are needed. Example: '[101, 102]'. The Power Apps V2 trigger does not support native Array inputs — arrays must be serialized as JSON strings by the caller.",
+      "default": "[]",
+      "examples": ["[101, 102]", "[]"]
+    },
+    "initiatorEmail": {
+      "type": "string",
+      "description": "Email address of the user who initiated the document. Always granted Read on the Svi predmeti item and associated files.",
+      "examples": ["korisnik@organizacija.rs"]
+    },
+    "documentType": {
+      "type": "string",
+      "description": "Document type string (e.g. 'Ulazni', 'Interni'). Used for future document-type-specific permission rule lookups from App Config. Pass empty string if no type-specific rules are needed (v1 behaviour: no type-specific overrides implemented).",
+      "default": "",
+      "examples": ["Ulazni", "Interni", "Izlazni"]
+    },
+    "orgUnitGroupId": {
+      "type": "string",
+      "description": "Entra group ID (object ID, not display name) for the document's organizational unit. The caller reads this from App Config before calling this flow. If empty, the flow falls back to the default org unit group from App Config. Must never be hardcoded in the caller.",
+      "default": "",
+      "examples": ["00000000-0000-0000-0000-000000000001"]
+    },
+    "additionalUserEmails": {
+      "type": "string",
+      "description": "JSON array string of individual user email addresses to grant Read access. Used for passing the current step's designated approver email. Pass '[]' if none. Example: '[\"odobravalac@organizacija.rs\"]'.",
+      "default": "[]",
+      "examples": ["[\"odobravalac@organizacija.rs\"]", "[]"]
+    },
+    "additionalGroupIds": {
+      "type": "string",
+      "description": "JSON array string of Entra group IDs (object IDs) to grant Read access. Used for passing the current step's approver group. Pass '[]' if none. Example: '[\"00000000-0000-0000-0000-000000000002\"]'.",
+      "default": "[]",
+      "examples": ["[\"00000000-0000-0000-0000-000000000002\"]", "[]"]
+    },
+    "correlationId": {
+      "type": "string",
+      "description": "Correlation ID from the parent flow. Pass the parent's varCorrelationId so all audit log entries for the document creation or approval transition share one correlationId. If empty, the flow generates a new GUID.",
+      "default": "",
+      "examples": ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+    }
+  },
+  "examples": [
+    {
+      "_comment": "Called from CF_DocCentralV3_CreateDocument — document created, no approvers yet",
+      "sviPredmetiItemId": 42,
+      "documentLibraryFileIds": "[101]",
+      "initiatorEmail": "korisnik@organizacija.rs",
+      "documentType": "Ulazni",
+      "orgUnitGroupId": "00000000-0000-0000-0000-000000000001",
+      "additionalUserEmails": "[]",
+      "additionalGroupIds": "[]",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    },
+    {
+      "_comment": "Called from CF_DocCentralV3_SendForApproval — grant access to step 1 approver",
+      "sviPredmetiItemId": 42,
+      "documentLibraryFileIds": "[101]",
+      "initiatorEmail": "korisnik@organizacija.rs",
+      "documentType": "Ulazni",
+      "orgUnitGroupId": "00000000-0000-0000-0000-000000000001",
+      "additionalUserEmails": "[\"odobravalac@organizacija.rs\"]",
+      "additionalGroupIds": "[]",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    },
+    {
+      "_comment": "Called from CF_DocCentralV3_ProcessApprovalResponse — grant access to step 2 group",
+      "sviPredmetiItemId": 42,
+      "documentLibraryFileIds": "[101]",
+      "initiatorEmail": "korisnik@organizacija.rs",
+      "documentType": "Ulazni",
+      "orgUnitGroupId": "00000000-0000-0000-0000-000000000001",
+      "additionalUserEmails": "[]",
+      "additionalGroupIds": "[\"00000000-0000-0000-0000-000000000002\"]",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    }
+  ],
+  "callerNotes": {
+    "calledBy": ["CF_DocCentralV3_CreateDocument", "CF_DocCentralV3_SendForApproval", "CF_DocCentralV3_ProcessApprovalResponse"],
+    "triggerType": "Power Apps (V2) — child flow",
+    "arraySerializationNote": "Pass array inputs (documentLibraryFileIds, additionalUserEmails, additionalGroupIds) as JSON strings, not native arrays. Use JSON() in Canvas App or string(array) expressions in flows.",
+    "orgUnitGroupIdSource": "The caller must read orgUnitGroupId from App Config (UNKNOWN key) before calling. Never hardcode group IDs.",
+    "failureHandling": "If this flow returns success=false, the parent flow logs the failure and continues. Permission failure is non-fatal for document creation — the document is created but access may be restricted to the service account only until permissions are repaired manually.",
+    "reCallBehaviour": "Each call to this flow re-breaks inheritance and re-applies all permissions from scratch. Calling it again on the same item (e.g. at approval step 2) does not accumulate permissions additionally — it replaces them. Callers must always pass the full set of principals to grant access."
+  }
+}

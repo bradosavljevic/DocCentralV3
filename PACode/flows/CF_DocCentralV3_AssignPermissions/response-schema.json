@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_AssignPermissions_Response",
+  "title": "CF_DocCentralV3_AssignPermissions — Response Schema",
+  "description": "Output returned by CF_DocCentralV3_AssignPermissions to calling flows. The flow always returns a structured response. Permission failure is non-fatal — callers must continue the primary operation and log the failure.",
+
+  "oneOf": [
+    {
+      "title": "Success response",
+      "description": "Returned when inheritance was broken and all configured principals were granted Read access on the Svi predmeti item and all specified document library files.",
+      "type": "object",
+      "required": ["success", "correlationId"],
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "const": true
+        },
+        "message": {
+          "type": "string",
+          "const": "Prava su uspešno dodeljena."
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Correlation ID used for this operation's audit log entries."
+        },
+        "errorCode": {
+          "type": "string",
+          "description": "Empty on success.",
+          "const": ""
+        }
+      }
+    },
+    {
+      "title": "Failure response",
+      "description": "Returned when an unexpected error prevented permission assignment (e.g. break inheritance failed, SharePoint REST API error). Callers must treat this as non-fatal for document creation — the document exists but its permissions may be incomplete.",
+      "type": "object",
+      "required": ["success", "message", "errorCode", "correlationId"],
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "const": false
+        },
+        "message": {
+          "type": "string",
+          "description": "Human-readable failure reason.",
+          "examples": [
+            "Greška pri dodeli prava.",
+            "Nije moguće prekinuti nasleđivanje prava.",
+            "Korisnik nije pronađen."
+          ]
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "Correlation ID, if resolved before the failure."
+        },
+        "errorCode": {
+          "type": "string",
+          "description": "Machine-readable error code.",
+          "enum": [
+            "PERMISSION_ASSIGNMENT_FAILED",
+            "PERMISSION_BREAK_FAILED",
+            "PERMISSION_USER_RESOLVE_FAILED"
+          ]
+        }
+      }
+    }
+  ],
+
+  "examples": [
+    {
+      "success": true,
+      "message": "Prava su uspešno dodeljena.",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "errorCode": ""
+    },
+    {
+      "success": false,
+      "message": "Greška pri dodeli prava.",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "errorCode": "PERMISSION_ASSIGNMENT_FAILED"
+    },
+    {
+      "success": false,
+      "message": "Nije moguće prekinuti nasleđivanje prava.",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "errorCode": "PERMISSION_BREAK_FAILED"
+    }
+  ],
+
+  "callerGuidance": {
+    "description": "How calling flows must handle this response.",
+    "rules": [
+      "Do NOT stop or fail the parent flow if success = false. The document has already been created — stopping now would leave an orphan item with no user access except the service account.",
+      "Log the failure in the parent flow's own AuditLog entry so administrators can identify documents with broken permissions.",
+      "Surface a user-facing warning in the Canvas App response when permission assignment fails: 'Dokument je kreiran, ali dodela prava nije uspela. Kontaktirajte administratora.'",
+      "Never retry this flow automatically. A retry without diagnosing the root cause may produce inconsistent permission state. Manual repair by an administrator is required.",
+      "Each call re-applies permissions from scratch (breaks inheritance again). Callers at approval step transitions must pass the full set of principals, not only the new approver."
+    ]
+  },
+
+  "powerAutomateOutputDefinition": {
+    "description": "Output parameters to define in the Respond to a PowerApp or flow action.",
+    "outputs": [
+      { "name": "success", "type": "boolean", "description": "True if all permissions assigned, false on any failure." },
+      { "name": "message", "type": "string", "description": "Result message in Serbian." },
+      { "name": "correlationId", "type": "string", "description": "Correlation ID for audit log tracing." },
+      { "name": "errorCode", "type": "string", "description": "Machine-readable error code. Empty on success." }
+    ]
+  }
+}
