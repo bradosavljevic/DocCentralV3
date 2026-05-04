@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_SendForApproval_TriggerInput",
+  "title": "CF_DocCentralV3_SendForApproval — Power Apps V2 Trigger Input Schema",
+  "description": "Input parameters for CF_DocCentralV3_SendForApproval. Called from the Canvas App when the initiator submits a document for approval. The approval chain is NOT passed by the caller — it is read from ProcesConfig in App Config by the flow, preventing Canvas App override.",
+  "type": "object",
+  "required": ["documentItemId", "delovodniBroj", "documentType", "initiatorEmail"],
+  "properties": {
+    "documentItemId": {
+      "type": "integer",
+      "description": "SharePoint item ID from Svi predmeti for the document being submitted for approval.",
+      "minimum": 1
+    },
+    "delovodniBroj": {
+      "type": "string",
+      "description": "Registry number of the document (e.g. '42/2026'). Used in audit log entries and notification email subjects.",
+      "examples": ["42/2026"]
+    },
+    "documentType": {
+      "type": "string",
+      "description": "Document type string. Used to look up the correct ProcesConfig from App Config. Must match an App Config entry.",
+      "examples": ["Ulazni", "Izlazni", "Interni"]
+    },
+    "initiatorEmail": {
+      "type": "string",
+      "description": "Email of the user submitting the document for approval. Retained on the document item as InicijatorEmail and used to notify on rejection or completion.",
+      "examples": ["korisnik@organizacija.rs"]
+    },
+    "initiatorDisplayName": {
+      "type": "string",
+      "description": "Display name of the initiator. Used in notification emails.",
+      "default": "",
+      "examples": ["Korisnik Prezime"]
+    },
+    "correlationId": {
+      "type": "string",
+      "description": "Correlation ID from the caller. If empty, the flow generates a new GUID.",
+      "default": "",
+      "examples": ["3fa85f64-5717-4562-b3fc-2c963f66afa6"]
+    }
+  },
+  "examples": [
+    {
+      "documentItemId": 42,
+      "delovodniBroj": "17/2026",
+      "documentType": "Ulazni",
+      "initiatorEmail": "korisnik@organizacija.rs",
+      "initiatorDisplayName": "Korisnik Prezime",
+      "correlationId": ""
+    }
+  ],
+  "callerNotes": {
+    "calledBy": "Canvas App — document detail screen or scrNoviPredmet after document creation",
+    "approvalChainSource": "ProcesConfig in App Config — read by the flow, never passed by the Canvas App",
+    "preconditions": "Document must exist in Svi predmeti. Stanje must NOT be 'U odobravanju' or 'Arhivirano'.",
+    "resubmissionNote": "May be called again after rejection (Stanje = 'Odbijeno'). The flow preserves existing IstorijaOdobravanjaJson and appends a RoundReset marker before resetting KoraciOdobravanjaJson."
+  }
+}

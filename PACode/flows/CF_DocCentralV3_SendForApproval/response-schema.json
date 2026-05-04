@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_SendForApproval_Response",
+  "title": "CF_DocCentralV3_SendForApproval — Response Schema",
+  "description": "Output returned to the Canvas App after submitting a document for approval.",
+  "oneOf": [
+    {
+      "title": "Success response",
+      "type": "object",
+      "required": ["success", "totalSteps", "correlationId"],
+      "properties": {
+        "success": { "type": "boolean", "const": true },
+        "message": { "type": "string", "const": "Dokument je poslat na odobrenje." },
+        "totalSteps": { "type": "integer", "description": "Total number of approval steps in the chain.", "minimum": 1 },
+        "firstApprover": { "type": "string", "description": "Email of the step 1 approver (if User type), or group ID (if Group type). For display in the Canvas App." },
+        "correlationId": { "type": "string" },
+        "errorCode": { "type": "string", "const": "" }
+      }
+    },
+    {
+      "title": "Failure response",
+      "type": "object",
+      "required": ["success", "message", "errorCode", "correlationId"],
+      "properties": {
+        "success": { "type": "boolean", "const": false },
+        "message": { "type": "string" },
+        "totalSteps": { "type": "integer", "const": 0 },
+        "firstApprover": { "type": "string", "const": "" },
+        "correlationId": { "type": "string" },
+        "errorCode": {
+          "type": "string",
+          "enum": [
+            "DOCUMENT_NOT_FOUND",
+            "ALREADY_IN_APPROVAL",
+            "DOCUMENT_ARCHIVED",
+            "NO_PROCESS_CONFIG",
+            "NO_APPROVAL_STEPS",
+            "STATUS_UPDATE_FAILED",
+            "SEND_FOR_APPROVAL_FAILED"
+          ]
+        }
+      }
+    }
+  ],
+  "examples": [
+    {
+      "success": true,
+      "message": "Dokument je poslat na odobrenje.",
+      "totalSteps": 2,
+      "firstApprover": "odobravalac@organizacija.rs",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "errorCode": ""
+    },
+    {
+      "success": false,
+      "message": "Dokument je već u procesu odobrenja.",
+      "totalSteps": 0,
+      "firstApprover": "",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "errorCode": "ALREADY_IN_APPROVAL"
+    }
+  ],
+  "powerAutomateOutputDefinition": {
+    "outputs": [
+      { "name": "success", "type": "boolean" },
+      { "name": "message", "type": "string" },
+      { "name": "totalSteps", "type": "integer" },
+      { "name": "firstApprover", "type": "string" },
+      { "name": "correlationId", "type": "string" },
+      { "name": "errorCode", "type": "string" }
+    ]
+  }
+}
