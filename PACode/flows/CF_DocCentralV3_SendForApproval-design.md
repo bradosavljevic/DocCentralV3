@@ -3,13 +3,14 @@
 ## Purpose
 
 Initiates the approval process for a document.
-Creates one or more `ApprovalSteps` records in SharePoint.
-Sends notifications to the first approver (user or group).
+Reads the approval chain from **ProcesConfig** in App Config.
+Writes the approval chain definition and current step state to `Svi predmeti` fields.
+Sends a notification email to the first step's approver.
 Updates the document `Stanje` to `U odobravanju`.
-Grants the first approver(s) Read access to the document via `CF_DocCentralV3_AssignPermissions`.
+Grants the first approver(s) Read access via `CF_DocCentralV3_AssignPermissions`.
 
-This flow is called from the Canvas App by users who have the right to send a document
-for approval. It does not auto-trigger — it is explicitly invoked by the initiator.
+There is no separate ApprovalSteps SharePoint list.
+All approval state lives on the `Svi predmeti` item.
 
 ## Trigger type
 
@@ -20,7 +21,6 @@ Power Apps V2. Called directly from Canvas App.
 - `gpdoccen_CR_DocCentralV3_SharePoint`
 - `gpdoccen_CR_DocCentralV3_Outlook`
 - `gpdoccen_CR_DocCentralV3_Office365Groups`
-- `gpdoccen_CR_DocCentralV3_Office365Users`
 
 ## Environment variables used
 
@@ -28,12 +28,6 @@ Power Apps V2. Called directly from Canvas App.
 - `gpdoccen_EV_DocCentralV3_lstSviPredmeti`
 - `gpdoccen_EV_DocCentralV3_lstAppConfig`
 - `gpdoccen_EV_DocCentralV3_lstAuditLog`
-- `gpdoccen_EV_DocCentralV3_docDokumenti`
-
-## ApprovalSteps list
-
-See `PACode/sharepoint/approval-steps-list.md` for full column schema.
-Environment variable for this list: UNKNOWN — `EV_DocCentralV3_lstApprovalSteps` (not yet created in solution).
 
 ## Input schema
 
@@ -42,25 +36,14 @@ Environment variable for this list: UNKNOWN — `EV_DocCentralV3_lstApprovalStep
   "documentItemId": 0,
   "delovodniBroj": "",
   "documentType": "",
-  "approvalSteps": [
-    {
-      "stepNumber": 1,
-      "assigneeType": "User",
-      "assigneeUserEmail": "",
-      "assigneeGroupId": "",
-      "assigneeGroupName": ""
-    }
-  ],
   "initiatorEmail": "",
   "initiatorDisplayName": "",
   "correlationId": ""
 }
 ```
 
-- `approvalSteps`: ordered array defining the full approval chain. At least one step required.
-- `assigneeType`: `"User"` or `"Group"`.
-- If `assigneeType = "User"`: `assigneeUserEmail` is required.
-- If `assigneeType = "Group"`: `assigneeGroupId` and `assigneeGroupName` are required.
+The approval chain is **not passed by the Canvas App**.
+It is read from ProcesConfig in App Config by the flow, preventing Canvas App override.
 
 ## Output schema
 
@@ -69,7 +52,8 @@ Success:
 {
   "success": true,
   "message": "Dokument je poslat na odobrenje.",
-  "firstStepAssignee": "",
+  "totalSteps": 0,
+  "firstApprover": "",
   "correlationId": ""
 }
 ```
@@ -84,15 +68,47 @@ Failure:
 }
 ```
 
+## Confirmed Svi predmeti fields written by this flow
+
+| Display name | Type | Internal name | Value set |
+|---|---|---|---|
+| Stanje | Choice/Text | UNKNOWN | `U odobravanju` |
+| TrenutniKorakOdobravanja | Number | UNKNOWN | `1` |
+| TrenutniOdobravalacEmail | Single line of text | UNKNOWN | Step 1 user email (or `""` if group) |
+| TrenutnaGrupaOdobravanjaId | Single line of text | UNKNOWN | Step 1 group ID (or `""` if user) |
+| UkupnoKorakaOdobravanja | Number | UNKNOWN | Count of steps from ProcesConfig |
+| KoraciOdobravanjaJson | Multiple lines of text | UNKNOWN | Serialized JSON — all steps with status `Pending` |
+| IstorijaOdobravanjaJson | Multiple lines of text | UNKNOWN | `[]` on first send; preserved + extended on resubmission |
+
+## ProcesConfig dependency
+
+Flow reads ProcesConfig from App Config filtered by `documentType` (UNKNOWN filter key).
+If no ProcesConfig found for the document type: try a default/fallback config.
+If none: fail with `NO_PROCESS_CONFIG`.
+
+Assumed ProcesConfig step structure (UNKNOWN until AppConfig.csv confirmed):
+```json
+{
+  "steps": [
+    {
+      "stepNumber": 1,
+      "assigneeType": "User",
+      "assigneeEmail": "approver@org.rs",
+      "assigneeGroupId": ""
+    }
+  ]
+}
+```
+
 ## Pre-conditions checked by flow
 
 | Check | Failure code |
 |---|---|
 | Document exists in Svi predmeti | DOCUMENT_NOT_FOUND |
-| Document Stanje is not already `U odobravanju` | ALREADY_IN_APPROVAL |
-| Document Stanje is not `Arhivirano` | DOCUMENT_ARCHIVED |
-| At least one approval step provided | NO_APPROVAL_STEPS |
-| Step numbers are unique and sequential starting at 1 | INVALID_STEP_SEQUENCE |
+| Stanje is not `U odobravanju` | ALREADY_IN_APPROVAL |
+| Stanje is not `Arhivirano` | DOCUMENT_ARCHIVED |
+| ProcesConfig exists for document type | NO_PROCESS_CONFIG |
+| ProcesConfig has at least one step | NO_APPROVAL_STEPS |
 
 ## Flow steps
 
@@ -100,6 +116,7 @@ Failure:
 
 **Step 1 — Initialize variables**
 - `varCorrelationId` = input or `guid()`
+- `varApprovalSteps` (Array) = []
 
 **Step 2 — Log Started**
 Call `CF_DocCentralV3_LogEvent`:
@@ -115,93 +132,98 @@ Call `CF_DocCentralV3_LogEvent`:
 
 **Step 3 — Read document from Svi predmeti**
 Action: SharePoint — Get item
-List: `EV_DocCentralV3_lstSviPredmeti`
 ID: input `documentItemId`
 
 If not found: return failure `DOCUMENT_NOT_FOUND`.
 
-Check `Stanje` field value:
+Check `Stanje`:
 - If `U odobravanju`: return failure `ALREADY_IN_APPROVAL`.
 - If `Arhivirano`: return failure `DOCUMENT_ARCHIVED`.
 
-**Step 4 — Validate approval steps array**
-Verify at least one step exists.
-Verify `stepNumber` values are 1, 2, 3... without gaps or duplicates.
-Verify each step has valid `assigneeType` and required assignee fields.
-On any failure: return `INVALID_STEP_SEQUENCE` or `INVALID_STEP_DATA`.
+Store `varDocETag` = item `@odata.etag`.
+Store existing `IstorijaOdobravanjaJson` value for resubmission handling (Step 6).
 
-**Step 5 — Create all ApprovalSteps records**
-Apply to each step in `approvalSteps` input array:
+**Step 4 — Read ProcesConfig from App Config**
+Action: SharePoint — Get items from App Config
+Filter: ProcesConfig category AND documentType matches input `documentType` (UNKNOWN filter expression).
+Top: 1
 
-Action: SharePoint — Create item
-List: `EV_DocCentralV3_lstApprovalSteps`
+If not found: try default ProcesConfig (UNKNOWN key).
+If still not found: return failure `NO_PROCESS_CONFIG`.
 
-Fields per step:
+Parse the steps JSON from ProcesConfig into `varApprovalSteps` array.
+If empty: return failure `NO_APPROVAL_STEPS`.
 
-| Column | Value |
-|---|---|
-| Title | `concat("Odobrenje ", delovodniBroj, " - korak ", stepNumber)` |
-| DocumentItemId | input `documentItemId` |
-| DelovodniBroj | input `delovodniBroj` |
-| StepNumber | step `stepNumber` |
-| AssigneeType | step `assigneeType` |
-| AssigneeUserEmail | step `assigneeUserEmail` (empty string if Group) |
-| AssigneeGroupId | step `assigneeGroupId` (empty string if User) |
-| AssigneeGroupName | step `assigneeGroupName` (empty string if User) |
-| StepStatus | `Pending` |
-| InitiatorEmail | input `initiatorEmail` |
-| CorrelationId | `varCorrelationId` |
-| NotificationSent | false |
+**Step 5 — Build initial KoraciOdobravanjaJson**
+Compose JSON array from `varApprovalSteps` with `status = "Pending"` on each step.
 
-Store created item IDs in a variable array `varCreatedStepIds` for reference.
+Example:
+```json
+[
+  {"stepNumber": 1, "assigneeType": "User", "assigneeEmail": "a@b.rs", "assigneeGroupId": "", "status": "Pending", "resolvedBy": null, "resolvedAt": null, "comments": null},
+  {"stepNumber": 2, "assigneeType": "Group", "assigneeEmail": "", "assigneeGroupId": "group-guid", "status": "Pending", "resolvedBy": null, "resolvedAt": null, "comments": null}
+]
+```
 
-**Step 6 — Update document Stanje to `U odobravanju`**
+Store as `varKoraciJson` string.
+
+**Step 6 — Build or preserve IstorijaOdobravanjaJson**
+If existing `IstorijaOdobravanjaJson` from Step 3 is not empty and not `[]`:
+- This is a resubmission. Append a round-marker entry to the existing history.
+- Store as `varIstorijaJson`.
+Otherwise:
+- `varIstorijaJson = "[]"`.
+
+**Step 7 — Update Svi predmeti item with approval state (If-Match)**
 Action: SharePoint HTTP PATCH on Svi predmeti item
-Update the `Stanje` column (UNKNOWN internal name) to `U odobravanju`.
+Header: `If-Match: <varDocETag>`
 
-If update fails: this is a critical failure. Approval steps were created but document status
-not updated. Log as Error. Attempt to delete created ApprovalSteps records (compensating action).
-Return failure response.
+Fields (display names confirmed; internal names UNKNOWN — replace with internal names when confirmed):
+- `Stanje` → `U odobravanju`
+- `TrenutniKorakOdobravanja` → `1`
+- `TrenutniOdobravalacEmail` → step 1 `assigneeEmail` (or `""` if group)
+- `TrenutnaGrupaOdobravanjaId` → step 1 `assigneeGroupId` (or `""` if user)
+- `UkupnoKorakaOdobravanja` → count of steps in `varApprovalSteps`
+- `KoraciOdobravanjaJson` → `varKoraciJson`
+- `IstorijaOdobravanjaJson` → `varIstorijaJson`
 
-**Step 7 — Activate first step (StepNumber = 1)**
-Identify the first step from the input array (`stepNumber = 1`).
-Store its created SharePoint item ID as `varFirstStepItemId`.
+If 412 Precondition Failed: re-read item, re-check Stanje. Retry once with fresh ETag.
+If update fails: return failure `STATUS_UPDATE_FAILED`.
 
-**Step 7a — Resolve notification recipients for first step**
+**Step 8 — Resolve notification recipients for step 1**
+Store step 1 from `varApprovalSteps` as `varStep1`.
 
-If `assigneeType = "User"`:
-- Recipient list = [`assigneeUserEmail`]
+If `varStep1.assigneeType = "User"`:
+- `varRecipients` = [`varStep1.assigneeEmail`]
 
-If `assigneeType = "Group"`:
-- Action: Office365Groups — List group members using `assigneeGroupId`
-- Collect all member email addresses into `varGroupMemberEmails`
-- Recipient list = `varGroupMemberEmails`
+If `varStep1.assigneeType = "Group"`:
+- Action: Office365Groups — List members of `varStep1.assigneeGroupId`
+- Extract member emails → `varRecipients`
 
-**Step 7b — Grant first step approver(s) access**
+**Step 9 — Grant step 1 approver(s) access**
 Call child flow `CF_DocCentralV3_AssignPermissions`:
 - `sviPredmetiItemId`: input `documentItemId`
-- `documentLibraryFileIds`: [] (file IDs not passed here — caller should pass if needed; default to empty for approval-only permission grant)
+- `documentLibraryFileIds`: []
 - `initiatorEmail`: input `initiatorEmail`
 - `documentType`: input `documentType`
-- `orgUnitGroupId`: empty (org unit already set at document creation; this call only adds approver)
-- `additionalUserEmails`: recipient list from Step 7a (if User type or resolved group members)
-- `additionalGroupIds`: [input `assigneeGroupId`] if Group type
+- `orgUnitGroupId`: empty (already set at document creation)
+- `additionalUserEmails`: `varRecipients` if User type, else []
+- `additionalGroupIds`: [`varStep1.assigneeGroupId`] if Group type, else []
 - `correlationId`: `varCorrelationId`
 
-Permission failure at this step is non-fatal — log warning, continue.
+Permission failure is non-fatal. Log warning and continue.
 
-**Step 7c — Send notification to first step recipient(s)**
-Action: Outlook — Send an email (V2) to each recipient in the list.
+**Step 10 — Send notification email to step 1 recipients**
+For each recipient in `varRecipients`:
+Action: Outlook — Send email (V2)
+- Subject: `concat("DocCentral: Zahtev za odobrenje dokumenta ", delovodniBroj)`
+- Body: Document registry number, initiator name, instruction to open Canvas App.
+  (Template UNKNOWN — placeholder until confirmed.)
+- Approver uses Canvas App. No approval links in email.
 
-Email content (template — exact text UNKNOWN until localization is confirmed):
-- Subject: `concat("DocCentral: Zahtev za odobrenje - ", delovodniBroj)`
-- Body: Informational email describing the document, initiator, and instructions to open the Canvas App.
-  - Do not include a direct approval link in the email — the approver uses the Canvas App.
-  - If PA Approvals connector notification card is configured (UNKNOWN App Config toggle), also send an Approval action card.
+Email failure per recipient is non-fatal. Log warning.
 
-After sending, update the first ApprovalSteps item: `NotificationSent = true`.
-
-**Step 8 — Log Success**
+**Step 11 — Log Success**
 Call `CF_DocCentralV3_LogEvent`:
 - EventType: `SendForApproval`
 - Severity: `Info`
@@ -209,62 +231,51 @@ Call `CF_DocCentralV3_LogEvent`:
 - DocumentItemId: input `documentItemId`
 - DelovodniBroj: input `delovodniBroj`
 - CorrelationId: `varCorrelationId`
-- Message: `concat("Dokument ", delovodniBroj, " je poslat na odobrenje.")`
+- Message: `concat("Dokument ", delovodniBroj, " je poslat na odobrenje. Koraci: ", string(length(varApprovalSteps)), ".")`
 
-**Step 9 — Return success response**
+**Step 12 — Return success response**
 
 ### Catch scope
-
-Compensating action attempt:
-- If ApprovalSteps records were created but document status update failed:
-  attempt to delete created ApprovalSteps records before returning error.
 
 Call `CF_DocCentralV3_LogEvent`:
 - EventType: `SendForApproval`
 - Severity: `Error`
 - Status: `Failed`
-- ErrorCode: derived from failure point
 - CorrelationId: `varCorrelationId`
 
 Return failure response.
-
-## Sequential approval — activation rule
-
-Only StepNumber = 1 is activated (notification sent, permissions granted) when this flow runs.
-Subsequent steps are activated by `CF_DocCentralV3_ProcessApprovalResponse` after each step completes.
-All steps have `StepStatus = Pending` at creation; only the active step has `NotificationSent = true`.
 
 ## Error codes
 
 | Code | Meaning |
 |---|---|
 | DOCUMENT_NOT_FOUND | Document item not found in Svi predmeti |
-| ALREADY_IN_APPROVAL | Document is already in U odobravanju status |
-| DOCUMENT_ARCHIVED | Document is Arhivirano and cannot enter approval |
-| NO_APPROVAL_STEPS | Input approvalSteps array is empty |
-| INVALID_STEP_SEQUENCE | Step numbers are not sequential or have duplicates |
-| INVALID_STEP_DATA | A step is missing required assignee fields |
-| STATUS_UPDATE_FAILED | Could not update document Stanje |
+| ALREADY_IN_APPROVAL | Document Stanje is already U odobravanju |
+| DOCUMENT_ARCHIVED | Document is Arhivirano, cannot enter approval |
+| NO_PROCESS_CONFIG | No ProcesConfig found in App Config for this document type |
+| NO_APPROVAL_STEPS | ProcesConfig has no steps defined |
+| STATUS_UPDATE_FAILED | Could not PATCH Svi predmeti with approval state |
 
 ## Open items
 
 | Item | Status |
 |---|---|
-| ApprovalSteps list environment variable | UNKNOWN — EV_DocCentralV3_lstApprovalSteps not yet in solution |
-| Svi predmeti Stanje internal column name | UNKNOWN |
-| App Config toggle for PA Approvals notification card | UNKNOWN |
-| Email template content and language | UNKNOWN |
-| Whether document library file IDs should be passed here for permission re-grant | To be decided — currently empty |
+| Internal column names for all Svi predmeti approval fields | UNKNOWN — display names confirmed |
+| ProcesConfig App Config structure and exact filter key | UNKNOWN until AppConfig.csv confirmed |
+| Notification email body template | UNKNOWN |
+| Approval permission retention policy App Config key | UNKNOWN |
+| Resubmission detection — whether IstorijaOdobravanjaJson = null or [] on first send | To confirm from actual list default value |
 
 ## Test scenarios
 
 | Scenario | Expected result |
 |---|---|
-| Single user approval step | One ApprovalSteps record, notification sent to user |
-| Three sequential steps | Three records created, only step 1 notified |
-| Group approval step | Group members resolved, all receive notification |
-| Document already in U odobravanju | Failure: ALREADY_IN_APPROVAL |
-| Document is Arhivirano | Failure: DOCUMENT_ARCHIVED |
-| Duplicate step numbers in input | Failure: INVALID_STEP_SEQUENCE |
-| Notification email fails | Warning logged, flow does not fail |
-| Permission assignment fails | Warning logged, flow does not fail |
+| Single user step, ProcesConfig found | Stanje = U odobravanju, step 1 fields set, email sent |
+| Two sequential steps | Both steps in KoraciOdobravanjaJson, only step 1 activated |
+| Group step | Group members resolved, all notified, TrenutnaGrupaOdobravanjaId set |
+| Document already in U odobravanju | ALREADY_IN_APPROVAL |
+| No ProcesConfig for document type | NO_PROCESS_CONFIG |
+| Email notification fails | Warning logged, flow succeeds |
+| Permission grant fails | Warning logged, flow succeeds |
+| Concurrent update (412 on Svi predmeti) | Retry once with fresh ETag |
+| Resubmission after rejection | IstorijaOdobravanjaJson preserved, KoraciOdobravanjaJson reset |

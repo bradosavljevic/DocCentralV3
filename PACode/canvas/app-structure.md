@@ -77,7 +77,9 @@ Navigation triggers `Navigate()` with a `ScreenTransition.None` or `Fade` transi
 | colUserGroups | App.OnStart | Office365Groups connector | Current user's Entra group IDs |
 | colPartneri | scrPartneri.OnVisible | Partneri list | Active (non-deleted) partners |
 | colRezervisaniBrojevi | scrNoviPredmet.OnVisible | Rezervisani brojevi list | Available reserved numbers |
-| colZaOdobrenje | scrZaOdobrenje.OnVisible | ApprovalSteps list | Approval steps pending for current user |
+| colZaOdobrenje | scrZaOdobrenje.OnVisible | Svi predmeti list | Documents in U odobravanju where current user is the assigned approver |
+| colUserGroupIds | App.OnStart | Office365Groups connector | Current user's Entra group object IDs (for group-step approval filter) |
+| colProcesConfig | App.OnStart | Filtered from colAppConfig | ProcesConfig entries — approval chain definitions per document type |
 | colPodsetnici | scrPodsetnici.OnVisible | Podsetnici list | User's reminders |
 | colArhiviranje | scrArhiviranje.OnVisible | Svi predmeti list | Documents in Zavedeno status for current year |
 
@@ -93,9 +95,10 @@ Navigation triggers `Navigate()` with a `ScreenTransition.None` or `Fade` transi
 7. Set colDocumentTypes = Filter(colAppConfig, Category = UNKNOWN_DOCTYPE_CATEGORY_KEY)
 8. Set colStatuses = Filter(colAppConfig, Category = UNKNOWN_STATUS_CATEGORY_KEY)
 9. Set colArchiveSigns = Filter(colAppConfig, Category = UNKNOWN_ARCHIVESIGN_CATEGORY_KEY)
-10. Set colProcessConfig = Filter(colAppConfig, Category = UNKNOWN_PROCESSCONFIG_CATEGORY_KEY)
+10. Set colProcesConfig = Filter(colAppConfig, Category = UNKNOWN_PROCESSCONFIG_CATEGORY_KEY)
 11. ClearCollect colUserGroups from Office365Groups.ListMyMemberOf() — extract group IDs
-12. Set gblIsAdmin based on whether gblCurrentUserEmail or colUserGroups match admin group from App Config (UNKNOWN key)
+12. ClearCollect colUserGroupIds with group object IDs only (extracted from colUserGroups — used for approval filter)
+13. Set gblIsAdmin based on whether gblCurrentUserEmail or colUserGroupIds match admin group from App Config (UNKNOWN key)
 13. Set gblAppConfigLoaded = true
 14. Set gblIsLoading = false
 15. Navigate(scrNoviPredmet)
@@ -202,27 +205,59 @@ On failure: Show error notification with message from flow response. Do not rese
 Shows all approval steps assigned to the current user (by email or group membership) that are still Pending.
 
 ### Data source
-`colZaOdobrenje` — filtered from `ApprovalSteps` list:
+`colZaOdobrenje` — filtered from `Svi predmeti`:
 - `StepStatus = "Pending"` AND (`AssigneeUserEmail = gblCurrentUserEmail` OR `AssigneeGroupId` is in `colUserGroups`)
 
 ### Key controls
 
 | Control | Type | Purpose |
 |---|---|---|
-| galZaOdobrenje | Gallery | List of pending approval steps |
+| galZaOdobrenje | Gallery | Documents pending current user's approval |
 | lblDelovodniBroj | Label | Registry number |
 | lblDocumentType | Label | Document type |
-| lblInitiator | Label | Who submitted the document |
-| lblStepNumber | Label | Approval step sequence |
+| lblInitiator | Label | Who submitted the document (`InicijatorEmail` — internal name UNKNOWN) |
+| lblCurrentStep | Label | Current approval step number |
+| lblTotalSteps | Label | Total steps in approval chain |
 | btnOdobri | Button | Approve the document |
 | btnOdbij | Button | Reject the document |
 | txtKomentar | Text input | Optional comment for approval/rejection decision |
 
-### Flow calls
-- `btnOdobri.OnSelect` → call `CF_DocCentralV3_ProcessApprovalResponse` with outcome = `Approved`
-- `btnOdbij.OnSelect` → call `CF_DocCentralV3_ProcessApprovalResponse` with outcome = `Rejected`
+### Data source
 
-After response: reload `colZaOdobrenje`.
+`colZaOdobrenje` is loaded from `Svi predmeti` on `scrZaOdobrenje.OnVisible`:
+
+```
+ClearCollect(
+  colZaOdobrenje,
+  Filter(
+    SviPredmeti,
+    Stanje = "U odobravanju" &&
+    (
+      TrenutniOdobravalacEmail = gblCurrentUserEmail ||
+      TrenutnaGrupaOdobravanjaId in colUserGroupIds
+    )
+  )
+)
+```
+
+Display names `TrenutniOdobravalacEmail`, `TrenutnaGrupaOdobravanjaId`, `Stanje` are confirmed. Internal column names are UNKNOWN.
+Replace with confirmed internal names when schema is available.
+
+If the `in` operator is not supported for delegation with a local collection, construct an
+explicit `Or()` chain from `colUserGroupIds`. If the user belongs to many approval-relevant
+groups, filter `colUserGroupIds` to only groups referenced in `colProcesConfig` before
+building the filter expression.
+
+### Flow calls
+- `btnOdobri.OnSelect` → call `CF_DocCentralV3_ProcessApprovalResponse` with:
+  - `documentItemId`: `galZaOdobrenje.Selected.ID`
+  - `outcome`: `"Approved"`
+  - `comments`: `txtKomentar.Text`
+  - `responderEmail`: `gblCurrentUserEmail`
+  - `responderDisplayName`: `gblCurrentUserDisplayName`
+- `btnOdbij.OnSelect` → same call with `outcome`: `"Rejected"`
+
+After response: reload `colZaOdobrenje` via `ClearCollect` as above.
 
 ## Screen: scrPodsetnici (Podsetnici)
 
@@ -357,6 +392,6 @@ Manage App Config codebooks — view and edit configuration entries. Export App 
 | Svi predmeti FilingYear column name | UNKNOWN |
 | Partneri IsDeleted column name | UNKNOWN |
 | Podsetnici CRUD access model (flow vs direct Patch) | TO BE DECIDED |
-| ApprovalSteps list environment variable logical name | UNKNOWN |
+| Svi predmeti internal column names for approval fields | UNKNOWN — display names confirmed |
 | Admin group App Config key | UNKNOWN |
 | Navigation component type (side bar vs top bar) | TO BE DECIDED during screen generation |

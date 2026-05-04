@@ -2,14 +2,17 @@
 
 ## Purpose
 
-Assigns item-level permissions on a newly created or updated document.
+Assigns item-level permissions on a document item and optionally on its library files.
 Breaks SharePoint inheritance on the `Svi predmeti` item and applies explicit permissions
 based on the document's organizational unit, initiator, and any approval participants.
 
-This flow is called as a child flow by `CF_DocCentralV3_CreateDocument` after the item
-and files are created. It may also be called by `CF_DocCentralV3_SendForApproval` when
-a new approver gains access, and by `CF_DocCentralV3_ProcessApprovalResponse` when access
-needs to be adjusted after approval completion.
+This flow is called as a child flow by:
+- `CF_DocCentralV3_CreateDocument` — after item and files are created.
+- `CF_DocCentralV3_SendForApproval` — to grant the first step's approver access.
+- `CF_DocCentralV3_ProcessApprovalResponse` — to grant access to the next step's approver when a step advances.
+
+There is no ApprovalSteps list. Permission grants for approval are driven by the current step
+state stored on the `Svi predmeti` item.
 
 ## Trigger type
 
@@ -44,12 +47,12 @@ Child flow (called by parent flows). Not called directly from Canvas App.
 ```
 
 - `sviPredmetiItemId`: SharePoint item ID in Svi predmeti — required.
-- `documentLibraryFileIds`: array of SharePoint file item IDs in Dokumenti library to apply same permissions.
+- `documentLibraryFileIds`: array of SharePoint file item IDs in Dokumenti library to apply same permissions. May be empty.
 - `initiatorEmail`: always gets explicit access to their own document.
 - `documentType`: used to look up permission rules from App Config (UNKNOWN key).
-- `orgUnitGroupId`: Entra group ID for the organizational unit. Read from App Config by the caller, passed in here. Must not be hardcoded.
-- `additionalUserEmails`: any individual users who should receive explicit access (e.g. approvers at the time of document creation).
-- `additionalGroupIds`: any additional Entra groups to grant access (e.g. supervisors).
+- `orgUnitGroupId`: Entra group ID for the organizational unit. Read from App Config by the caller and passed here. Must not be hardcoded.
+- `additionalUserEmails`: individual users to grant access (e.g. approver at current step).
+- `additionalGroupIds`: additional Entra groups to grant access (e.g. approver group at current step).
 - `correlationId`: passed from parent flow.
 
 ## Output schema
@@ -73,12 +76,12 @@ Failure:
 }
 ```
 
-## Permission model (from security-model.md and architecture)
+## Permission model
 
 - Users have Read Only access at site/list level.
-- Item-level inheritance is broken for each document item.
-- After break: explicit permissions are assigned per the rules below.
-- Service account always retains Full Control (it executes all writes).
+- Item-level inheritance is broken per document item.
+- After break: explicit permissions assigned per rules below.
+- Service account always retains Full Control.
 
 ### Default permission assignments per document item
 
@@ -86,26 +89,27 @@ Failure:
 |---|---|---|
 | Service account | Full Control | Always |
 | Initiator (by email) | Read | Always |
-| Org unit group (`orgUnitGroupId`) | Read | Always — read from App Config |
-| Additional users (`additionalUserEmails`) | Read | Passed by caller (e.g. approvers) |
+| Org unit group (`orgUnitGroupId`) | Read | Always — from App Config |
+| Additional users (`additionalUserEmails`) | Read | Passed by caller |
 | Additional groups (`additionalGroupIds`) | Read | Passed by caller |
 
-Permission levels (Read) are defined at the SharePoint site level. The flow references the
-existing site permission levels by name — it does not create new levels.
+Permission levels reference existing SharePoint site permission level definitions.
+The flow does not create new permission levels.
 
 ### Permission rules from App Config
 
-The caller is responsible for reading org unit group ID and any document-type-specific
-permission overrides from App Config before calling this flow. This flow does not read
-App Config directly except to fall back if `orgUnitGroupId` is empty and a default group
-is configured (UNKNOWN App Config key for default group).
+The caller is responsible for reading `orgUnitGroupId` and any document-type-specific
+permission overrides from App Config before calling this flow.
+This flow falls back to a default group from App Config (UNKNOWN key) if `orgUnitGroupId`
+is empty.
 
 ## Flow steps
 
 ### Try scope
 
 **Step 1 — Initialize variables**
-- `varCorrelationId` = input `correlationId` if not empty, else `guid()`
+- `varCorrelationId` = input or `guid()`
+- `varReadRoleDefId` (Integer) = 0
 
 **Step 2 — Log Started**
 Call `CF_DocCentralV3_LogEvent`:
@@ -117,56 +121,51 @@ Call `CF_DocCentralV3_LogEvent`:
 - CorrelationId: `varCorrelationId`
 - Message: "Pokretanje dodele prava na dokument."
 
-**Step 3 — Resolve org unit group (fallback)**
+**Step 3 — Resolve Read role definition ID**
+Action: SharePoint HTTP GET
+URI: `<SharePointSite>/_api/web/roledefinitions?$filter=Name eq 'Read'&$select=Id`
+Store `varReadRoleDefId` from the response.
+
+This lookup is performed once per flow run and reused for all principal assignments.
+
+**Step 4 — Resolve org unit group (fallback)**
 If input `orgUnitGroupId` is empty:
 - Read default group from App Config (UNKNOWN key for default org unit group).
-- If still empty: log warning and continue without org unit group assignment.
-  (Document will still have initiator access and service account access.)
+- If still empty: log warning, continue without org unit group.
 
-**Step 4 — Break permission inheritance on Svi predmeti item**
-Action: SharePoint HTTP request — Break role inheritance
-Method: POST
+**Step 5 — Break permission inheritance on Svi predmeti item**
+Action: SharePoint HTTP POST
 URI: `<SharePointSite>/_api/web/lists/getByTitle('<SviPredmetiList>')/items(<sviPredmetiItemId>)/breakroleinheritance(copyRoleAssignments=false,clearSubscopes=true)`
 
-`copyRoleAssignments=false` — start with empty permissions after break.
-`clearSubscopes=true` — clear any subscopings.
+`copyRoleAssignments=false` — start with empty explicit permissions after break.
 
-**Step 5 — Grant initiator access on Svi predmeti item**
-Action: SharePoint HTTP request — Add role assignment for user
-Resolve initiator's SharePoint user ID from email using:
-`/_api/web/ensureuser('<initiatorEmail>')`
-Then assign Read role using:
-`/_api/web/lists/getByTitle('<SviPredmetiList>')/items(<sviPredmetiItemId>)/roleassignments/addroleassignment(principalid=<userId>,roledefid=<ReadRoleDefinitionId>)`
+**Step 6 — Grant initiator Read on Svi predmeti item**
+Action: SharePoint HTTP POST — ensureuser for `initiatorEmail` → get user ID.
+Action: SharePoint HTTP POST — addroleassignment with `varReadRoleDefId`.
+URI pattern: `/_api/web/lists/getByTitle('<SviPredmetiList>')/items(<sviPredmetiItemId>)/roleassignments/addroleassignment(principalid=<userId>,roledefid=<varReadRoleDefId>)`
 
-Read role definition ID is read from the site's role definitions (UNKNOWN — determined at runtime via `/_api/web/roledefinitions?$filter=Name eq 'Read'`). Cache this value in a variable for reuse within this flow run.
-
-**Step 6 — Grant org unit group access on Svi predmeti item**
+**Step 7 — Grant org unit group Read on Svi predmeti item**
 Condition: `orgUnitGroupId` is not empty.
-Resolve group's SharePoint principal ID using `/_api/web/ensureuser('<groupId>')` or
-via the group object ID from Entra (UNKNOWN — exact SharePoint group resolution method
-for Entra security groups depends on the site's Entra group sync configuration).
-Assign Read role to group principal.
+Resolve group's SharePoint principal ID (see Open items — Entra group resolution method UNKNOWN).
+Assign Read role.
 
-**Step 7 — Grant additional users access on Svi predmeti item**
-Apply to each item in `additionalUserEmails` array (if not empty):
-- ensureuser → get user ID → addroleassignment with Read.
+**Step 8 — Grant additional users Read on Svi predmeti item**
+Apply to each item in `additionalUserEmails` (if not empty):
+- ensureuser → get user ID → addroleassignment Read.
 
-**Step 8 — Grant additional groups access on Svi predmeti item**
-Apply to each item in `additionalGroupIds` array (if not empty):
-- Resolve group principal ID → addroleassignment with Read.
+**Step 9 — Grant additional groups Read on Svi predmeti item**
+Apply to each item in `additionalGroupIds` (if not empty):
+- Resolve group principal → addroleassignment Read.
 
-**Step 9 — Apply same permissions to document library files**
-Apply to each item ID in `documentLibraryFileIds` array (if not empty):
-- Break role inheritance on the file item (same pattern as Step 4, targeting Dokumenti library).
+**Step 10 — Apply same permissions to document library files**
+Apply to each ID in `documentLibraryFileIds` (if not empty):
+- Break inheritance on file item (same pattern, targeting `docDokumenti` library).
 - Grant initiator Read.
-- Grant org unit group Read.
+- Grant org unit group Read (if set).
 - Grant additional users Read.
 - Grant additional groups Read.
 
-File-level permission break uses:
-`/_api/web/lists/getByTitle('<DokumentiLibrary>')/items(<fileItemId>)/breakroleinheritance(...)`
-
-**Step 10 — Log Success**
+**Step 11 — Log Success**
 Call `CF_DocCentralV3_LogEvent`:
 - EventType: `PermissionAssignment`
 - Severity: `Info`
@@ -175,7 +174,7 @@ Call `CF_DocCentralV3_LogEvent`:
 - CorrelationId: `varCorrelationId`
 - Message: "Prava su uspešno dodeljena."
 
-**Step 11 — Return success response**
+**Step 12 — Return success response**
 
 ### Catch scope
 
@@ -184,25 +183,23 @@ Call `CF_DocCentralV3_LogEvent`:
 - Severity: `Error`
 - Status: `Failed`
 - ErrorCode: `PERMISSION_ASSIGNMENT_FAILED`
-- ErrorMessage: error details from failed action
 - CorrelationId: `varCorrelationId`
 
 Return failure response.
 
 ## Caller responsibility
 
-The caller (`CF_DocCentralV3_CreateDocument`, `CF_DocCentralV3_SendForApproval`, etc.)
-is responsible for:
-1. Looking up the correct `orgUnitGroupId` from App Config before calling this flow.
-2. Passing the correct list of file IDs to protect.
-3. Treating a permission failure as a non-fatal warning at document creation time
-   (document is still created; permission failure is logged for manual remediation).
+Callers must:
+1. Look up the correct `orgUnitGroupId` from App Config before calling.
+2. Pass the correct file IDs (if file-level permissions are needed).
+3. Treat permission failure as non-fatal at document creation time.
+4. At approval step transition (`ProcessApprovalResponse`): pass the new step's approver email or group ID in `additionalUserEmails` / `additionalGroupIds`.
 
 ## Error codes
 
 | Code | Meaning |
 |---|---|
-| PERMISSION_ASSIGNMENT_FAILED | General failure during permission assignment |
+| PERMISSION_ASSIGNMENT_FAILED | General failure |
 | PERMISSION_BREAK_FAILED | Failed to break role inheritance |
 | PERMISSION_USER_RESOLVE_FAILED | Could not resolve user via ensureuser |
 
@@ -212,9 +209,9 @@ is responsible for:
 |---|---|
 | App Config key for default org unit group | UNKNOWN |
 | App Config key for document-type-specific permission overrides | UNKNOWN |
-| SharePoint Read role definition ID resolution method | To confirm — runtime lookup preferred |
-| Entra security group resolution to SharePoint principal | Depends on site configuration — UNKNOWN |
-| Whether file-level permissions are always applied or configurable | UNKNOWN — assume always for now |
+| Entra security group resolution to SharePoint principal (ensureuser vs group endpoint) | UNKNOWN — depends on site configuration |
+| Whether file-level permissions are always applied or configurable via App Config | UNKNOWN — assume always for now |
+| Permission retention policy for previous approvers after step advance | UNKNOWN — App Config key |
 
 ## Test scenarios
 
@@ -222,6 +219,6 @@ is responsible for:
 |---|---|
 | Standard document, single org unit group | Inheritance broken, initiator + group get Read |
 | No org unit group configured | Inheritance broken, initiator gets Read, warning logged |
-| Additional approver passed | Approver gets Read on item and files |
+| Additional approver passed | Approver gets Read on item |
 | Multiple files in documentLibraryFileIds | All files get same permissions |
-| SharePoint permission API returns error | Failure logged, non-fatal to document creation |
+| SharePoint permission API returns error | Failure logged, non-fatal to parent flow |

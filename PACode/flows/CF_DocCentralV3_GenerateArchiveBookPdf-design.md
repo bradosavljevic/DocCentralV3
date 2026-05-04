@@ -2,11 +2,14 @@
 
 ## Purpose
 
-Generates a PDF archive book (`Arhivska knjiga`) for a specified registry year.
-The archive book is a structured listing of all archived documents for that year,
-including their metadata and archive signs.
+Generates an HTML archive book (`Arhivska knjiga`) for a specified registry year and saves
+it to the `Exports` SharePoint library root.
 
-Scope for v1: archive book PDF only. No other document PDFs are generated in this version.
+The HTML file is print-ready / PDF-ready. The final PDF is produced by the user via
+browser print → Save as PDF. No premium connectors, no Word templates, no OneDrive
+conversion, no third-party connectors are required.
+
+Scope for v1: HTML file only. True PDF connector-based generation is out of scope.
 
 ## Trigger type
 
@@ -15,43 +18,6 @@ Power Apps V2. Called from Canvas App (Administracija screen or Arhiviranje scre
 ## Connection references used
 
 - `gpdoccen_CR_DocCentralV3_SharePoint`
-- `gpdoccen_CR_DocCentralV3_OneDrive`
-
-## Design note on PDF generation
-
-Power Automate does not natively generate PDF files.
-Available approaches in Power Platform context:
-
-**Option A — HTML → PDF via OneDrive/Word template**
-Generate an HTML or Word document, then convert to PDF using:
-- SharePoint/OneDrive file conversion (Convert file action — converts Word .docx to PDF).
-
-Recommended flow:
-1. Compose HTML content for the archive book.
-2. Convert HTML to a Word .docx using a template approach — LIMITATION: Power Automate
-   cannot natively convert HTML to .docx. This approach requires a Word template with
-   content controls populated by the flow.
-3. Use OneDrive — Convert file action to convert .docx to PDF.
-4. Save PDF to Exports library.
-
-**Option B — HTML file (interim)**
-For v1, generate an HTML file rather than a true PDF if PDF conversion tooling is unavailable.
-Save the HTML file in the Exports library. The user opens it in a browser and prints to PDF.
-This is a pragmatic v1 choice pending PDF tooling confirmation.
-
-**Option C — Power Apps HTML text control + print**
-Generate the archive book content in Canvas App as a rich HTML text view, allowing the user
-to print from the browser. No flow-generated PDF.
-
-**Recommended approach for v1: Option A (Word template → PDF via OneDrive conversion)**
-A Word template file is pre-placed in the Exports or a templates sub-folder.
-The flow copies the template, populates it via SharePoint file properties or via
-the Word Online connector (UNKNOWN — availability depends on license/connector access),
-then converts to PDF.
-
-If Word Online connector is unavailable: fall back to **Option B (HTML file)**.
-
-**Final approach: UNKNOWN — requires confirmation of available connectors and license.**
 
 ## Environment variables used
 
@@ -71,8 +37,8 @@ If Word Online connector is unavailable: fall back to **Option B (HTML file)**.
 }
 ```
 
-- `year`: the registry year for which to generate the archive book.
-  May be a closed year (to generate archive book after year closing) or the active year.
+- `year`: the registry year for which to generate the archive book. May be the active year
+  or a previously closed year. No restriction on year value.
 
 ## Output schema
 
@@ -97,30 +63,26 @@ Failure:
 }
 ```
 
-## Archive book content requirements
+## Confirmed Svi predmeti fields used in archive book
 
-The archive book must include for each archived document (UNKNOWN exact regulatory format —
-to be confirmed against Serbian archiving regulations or client requirement):
+| Display name | Confirmed | Internal name | Notes |
+|---|---|---|---|
+| DelovodniBroj | Confirmed | UNKNOWN | Registry number |
+| Stanje | Confirmed | UNKNOWN | Filter: must be Arhivirano |
+| Arhivirano | Confirmed | UNKNOWN | Date of archiving |
+| Arhivirao | Confirmed | UNKNOWN | User who archived |
+| PartnerNazivSnapshot | Confirmed | UNKNOWN | Historical partner name |
 
-| # | Column | Source |
+Additional fields for archive book content (display names assumed, UNKNOWN internal names):
+
+| Display name (assumed) | Internal name | Notes |
 |---|---|---|
-| 1 | Redni broj | Sequential row number |
-| 2 | Delovodni broj | Svi predmeti DelovodniBroj |
-| 3 | Datum zavođenja | Svi predmeti FilingDate (UNKNOWN column name) |
-| 4 | Naziv predmeta / sadržaj | Svi predmeti Title or Subject (UNKNOWN) |
-| 5 | Partner | PartnerNazivSnapshot from Svi predmeti |
-| 6 | Tip dokumenta | DocumentType from Svi predmeti |
-| 7 | Arhivski znak | ArhivskiZnak from Svi predmeti |
-| 8 | Datum arhiviranja | ArchivedAt from Svi predmeti (UNKNOWN column name) |
-| 9 | Ko je arhivirao | ArchivedBy from Svi predmeti (UNKNOWN column name) |
+| Title / Subject | UNKNOWN | Document subject/content description |
+| FilingDate | UNKNOWN | Date of filing — may be stored as date or derived from DelovodniBroj year |
+| DocumentType | UNKNOWN | Type of document |
+| ArhivskiZnak | UNKNOWN | Archive sign/classification code |
 
-All column names in Svi predmeti are UNKNOWN until list schema is confirmed.
-
-The archive book header must include:
-- Organization name (UNKNOWN — read from App Config or hardcoded per client)
-- Year
-- Generation date
-- Total number of documents
+All internal column names remain UNKNOWN until Svi predmeti schema is confirmed.
 
 ## Flow steps
 
@@ -128,7 +90,9 @@ The archive book header must include:
 
 **Step 1 — Initialize variables**
 - `varCorrelationId` = input or `guid()`
-- `varOutputFileName` = `concat("ArhivskaKnjiga_", string(year), "_", formatDateTime(utcNow(), 'yyyyMMdd_HHmmss'))`
+- `varOutputFileName` = `concat("ArhivskaKnjiga_", string(year), "_", formatDateTime(utcNow(), 'yyyyMMdd_HHmmss'), ".html")`
+- `varHtmlRows` (String) = empty
+- `varRowNumber` (Integer) = 0
 
 **Step 2 — Log Started**
 Call `CF_DocCentralV3_LogEvent`:
@@ -138,65 +102,109 @@ Call `CF_DocCentralV3_LogEvent`:
 - Status: `Started`
 - UserEmail: input `initiatorEmail`
 - CorrelationId: `varCorrelationId`
-- Message: `concat("Pokretanje generisanja arhivske knjige za godinu ", string(year))`
+- Message: `concat("Pokretanje generisanja arhivske knjige za godinu ", string(year), ".")`
 
-**Step 3 — Read archived documents for the year**
-Action: SharePoint — Get items (with paging)
-List: `EV_DocCentralV3_lstSviPredmeti`
-Filter: year = input `year` AND `Stanje = 'Arhivirano'`
-Order: by `DelovodniBroj` ascending (UNKNOWN column name for ordering)
-Top: up to 5000; use pagination for larger sets.
-
-(Year filter uses UNKNOWN column name — likely `FilingYear` or extracted from `FilingDate`.)
-
-Store all items in `varDocuments` array.
-
-If no archived documents: log Info. Return success with an empty archive book file
-(contains headers only — still a valid output).
-
-**Step 4 — Read organization name from App Config**
-Read organization display name from App Config (UNKNOWN key).
+**Step 3 — Read organization name from App Config**
+Action: SharePoint — Get items from App Config
+Filter: UNKNOWN key for organization display name.
 Store as `varOrgName`.
-If UNKNOWN: use placeholder `[Naziv organizacije]` in the output.
+If not found or empty: use placeholder `[Naziv organizacije]`.
 
-**Step 5 — Compose archive book content**
+**Step 4 — Read archived documents for the year (with pagination)**
+Action: SharePoint — Get items (Do-Until with `@odata.nextLink` pagination)
+List: `EV_DocCentralV3_lstSviPredmeti`
+Filter: `Stanje = 'Arhivirano'` AND year = input `year`
 
-Based on chosen approach (UNKNOWN — pending connector confirmation):
+Year filter approach (UNKNOWN — choose one based on actual schema):
+- Option A: filter by a dedicated year column if it exists (UNKNOWN column name).
+- Option B: filter by FilingDate range: `FilingDate ge '2026-01-01' and FilingDate lt '2027-01-01'`.
+- Option C: filter only by `Stanje = 'Arhivirano'` and apply year filter in memory if delegation is not possible.
 
-**Sub-option A: HTML generation**
-Compose an HTML string with:
-- Document header (org name, year, generation date, total count)
-- HTML table with one row per document
-- Styling inline (basic table borders, readable font)
+Prefer server-side filtering (Options A or B) for delegability and performance.
+
+Order: by `DelovodniBroj` ascending using numeric sort if a separate counter column exists;
+otherwise by a sortable date or ID column.
+
+Collect all results across pages into `varDocuments`.
+Store total count as `varTotalCount`.
+
+**Step 5 — Build HTML row content**
+Apply to each document in `varDocuments`:
+- Increment `varRowNumber` by 1.
+- Format `Arhivirano` date as `dd.MM.yyyy` (or empty string if null).
+- Format `FilingDate` as `dd.MM.yyyy` (or empty string if null).
+- Escape HTML special characters in text values (`<`, `>`, `&`, `"`) to prevent HTML injection.
+- Append one HTML `<tr>` row to `varHtmlRows`.
+
+Row template:
+```html
+<tr>
+  <td>{rowNumber}</td>
+  <td>{DelovodniBroj}</td>
+  <td>{FilingDate formatted}</td>
+  <td>{Subject / Title}</td>
+  <td>{PartnerNazivSnapshot}</td>
+  <td>{DocumentType}</td>
+  <td>{ArhivskiZnak}</td>
+  <td>{Arhivirano formatted}</td>
+  <td>{Arhivirao}</td>
+</tr>
+```
+
+If `varDocuments` is empty: `varHtmlRows` = a single row spanning all columns with message
+`"Nema arhiviranih dokumenata za ovu godinu."`.
+
+**Step 6 — Compose full HTML document**
+Compose the complete HTML string by combining:
+- HTML header and metadata (see HTML structure in `archive-book-output.md`)
+- Inline CSS for print-friendly layout
+- Table headers
+- `varHtmlRows`
+- HTML footer with generation metadata
 
 Store as `varHtmlContent`.
 
-**Sub-option B: Word template population**
-(UNKNOWN — requires Word Online connector and pre-existing template)
-- Copy Word template from templates location.
-- Populate content controls or use Find & Replace for placeholders.
-- Generate rows via template logic.
+Full HTML structure — see `PACode/sharepoint/archive-book-output.md` for the template.
 
-**Step 6 — Save output file to Exports library**
+Key CSS for print:
+```css
+@media print {
+  body { margin: 10mm; font-size: 9pt; }
+  thead { display: table-header-group; }
+  tr { page-break-inside: avoid; }
+  @page { size: A4 landscape; margin: 10mm; }
+}
+```
 
-For HTML approach:
+The `@page` rule sets A4 landscape orientation, which is appropriate for a wide table.
+
+**Step 7 — Save HTML file to Exports library root**
 Action: SharePoint — Create file
-File name: `varOutputFileName` + `.html`
-Content: `varHtmlContent`
+Site: `EV_DocCentralV3_SharePointSite`
+Folder path: root of `EV_DocCentralV3_docExports` (no subfolder)
+File name: `varOutputFileName`
+File content: `varHtmlContent` encoded as UTF-8
 
-For PDF approach (Word → PDF):
-Action: OneDrive — Convert file (Word .docx → PDF)
-Save PDF to Exports library.
+UTF-8 BOM (`﻿` — character U+FEFF) must be prepended to `varHtmlContent` before saving.
+This ensures Serbian characters (č, ć, š, ž, đ) render correctly when opened in Windows browsers.
 
-Store `varFileWebUrl` from the create/convert response.
+Implementation note: In Power Automate, UTF-8 BOM can be prepended using:
+`concat(uriComponentToString('%EF%BB%BF'), varHtmlContent)`
 
-**Step 7 — Log Success**
+Store `varFileWebUrl` from the create file response (SharePoint file URL).
+
+**Step 8 — Log Success**
 Call `CF_DocCentralV3_LogEvent`:
 - EventType: `GenerateArchiveBookPdf`
+- EventCategory: `Archive`
+- Severity: `Info`
 - Status: `Success`
-- Message: `concat("Arhivska knjiga za ", string(year), " generisana: ", varOutputFileName)`
+- UserEmail: input `initiatorEmail`
+- CorrelationId: `varCorrelationId`
+- Message: `concat("Arhivska knjiga za ", string(year), " generisana: ", varOutputFileName, ". Ukupno dokumenata: ", string(varTotalCount), ".")`
 
-**Step 8 — Return success response**
+**Step 9 — Return success response**
+Return `fileUrl` = `varFileWebUrl` and `fileName` = `varOutputFileName`.
 
 ### Catch scope
 
@@ -209,32 +217,50 @@ Call `CF_DocCentralV3_LogEvent`:
 
 Return failure response.
 
+## HTML encoding
+
+- File encoding: UTF-8 with BOM.
+- HTML `<meta charset="UTF-8">` is always present.
+- All text values from SharePoint are HTML-escaped before insertion into the template.
+- Date values are formatted as `dd.MM.yyyy` using Power Automate `formatDateTime()`.
+
+## File naming
+
+Format: `ArhivskaKnjiga_{year}_{YYYYMMDD_HHmmss}.html`
+Example: `ArhivskaKnjiga_2026_20261215_083012.html`
+
+Files are saved in the root of the Exports library. No subfolders.
+No automatic cleanup. Old export files are deleted manually by admins.
+
 ## Error codes
 
 | Code | Meaning |
 |---|---|
-| ARCHIVE_BOOK_GENERATION_FAILED | General failure |
-| NO_ARCHIVED_DOCUMENTS | No archived documents found for the given year (soft — returns file with headers) |
-| FILE_SAVE_FAILED | Could not save output file to Exports library |
+| ARCHIVE_BOOK_GENERATION_FAILED | General failure during read or file creation |
+| FILE_SAVE_FAILED | Could not save HTML file to Exports library |
+
+Note: Empty result (no archived documents for the year) is not an error. The file is
+created with headers and an empty-data message row, and success is returned.
 
 ## Open items
 
 | Item | Status |
 |---|---|
-| PDF generation approach (HTML / Word+PDF / HTML only) | UNKNOWN — requires connector confirmation |
-| Regulatory format of archive book | UNKNOWN — requires client/legal input |
-| Svi predmeti column names for archive book content | UNKNOWN |
-| AuditLog EventType for GenerateArchiveBookPdf | Present in EventType list — confirmed |
+| Svi predmeti internal column names for all archive book fields | UNKNOWN |
+| Year filter strategy (dedicated year column vs date range) | UNKNOWN — depends on schema |
 | Organization name App Config key | UNKNOWN |
-| Word template file location and structure | UNKNOWN — needed if Option A chosen |
-| Paging strategy for very large document sets (> 5000) | To be implemented with do-until pagination |
+| Sort strategy for DelovodniBroj (text vs numeric) | UNKNOWN — depends on schema |
+| FilingDate column internal name and type | UNKNOWN |
+| DocumentType internal column name | UNKNOWN |
+| ArhivskiZnak internal column name | UNKNOWN |
 
 ## Test scenarios
 
 | Scenario | Expected result |
 |---|---|
-| Year with 50 archived documents | Archive book generated with 50 rows |
-| Year with no archived documents | File created with headers only, success response |
-| Year input for a closed year | Works same as active year — no restriction |
+| Year with 50 archived documents | HTML file with 50 rows, download URL returned |
+| Year with no archived documents | HTML file with header and empty message, success returned |
+| Year is closed prior year | Works same — no restriction on year value |
 | File save to Exports library fails | Error returned, audit logged |
-| Document count exceeds 5000 | Pagination handles all documents |
+| Document count exceeds 5000 | Pagination collects all pages before composing HTML |
+| Serbian characters in document titles | Correctly rendered due to UTF-8 BOM |

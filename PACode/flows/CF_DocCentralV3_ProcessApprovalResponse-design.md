@@ -3,13 +3,15 @@
 ## Purpose
 
 Processes an approval or rejection response from an approver.
-Updates the `ApprovalSteps` record with the outcome.
-Updates the document `Stanje` in `Svi predmeti`.
-If approved and more steps remain, activates the next step.
-If rejected, sets document to `Odbijeno` and notifies the initiator.
-If all steps are approved, sets document to `Odobreno`.
+Reads the current approval state from `Svi predmeti` fields (`KoraciOdobravanjaJson`, `TrenutniKorakOdobravanja`).
+Updates the current step's outcome in `KoraciOdobravanjaJson`.
+Appends the decision to `IstorijaOdobravanjaJson`.
+Updates document `Stanje`.
+If approved and more steps remain: activates the next step (updates current approver fields, sends notification).
+If rejected: sets document to `Odbijeno`, notifies `InicijatorEmail`.
+If all steps approved: sets document to `Odobreno`, notifies `InicijatorEmail`.
 
-This flow is the resolution point for the entire approval process.
+There is no separate ApprovalSteps list. All state is on the `Svi predmeti` item.
 
 ## Trigger type
 
@@ -25,17 +27,13 @@ Power Apps V2. Called directly from Canvas App when an approver clicks Approve o
 
 - `gpdoccen_EV_DocCentralV3_SharePointSite`
 - `gpdoccen_EV_DocCentralV3_lstSviPredmeti`
-- `gpdoccen_EV_DocCentralV3_lstAppConfig`
 - `gpdoccen_EV_DocCentralV3_lstAuditLog`
-- `gpdoccen_EV_DocCentralV3_docDokumenti`
-
-ApprovalSteps list: environment variable UNKNOWN (`EV_DocCentralV3_lstApprovalSteps`).
 
 ## Input schema
 
 ```json
 {
-  "approvalStepItemId": 0,
+  "documentItemId": 0,
   "outcome": "Approved",
   "comments": "",
   "responderEmail": "",
@@ -44,10 +42,9 @@ ApprovalSteps list: environment variable UNKNOWN (`EV_DocCentralV3_lstApprovalSt
 }
 ```
 
-- `approvalStepItemId`: ID of the specific `ApprovalSteps` item being resolved.
+- `documentItemId`: ID of the document in Svi predmeti.
 - `outcome`: `"Approved"` or `"Rejected"`.
-- `responderEmail`: email of the user who is responding (validated against step's assignee).
-- `comments`: optional free-text comment from the approver.
+- `responderEmail`: validated by the flow against the current step's assignee.
 
 ## Output schema
 
@@ -71,25 +68,39 @@ Failure:
 }
 ```
 
+## Confirmed Svi predmeti fields read and written by this flow
+
+| Display name | Type | Read | Written | Internal name |
+|---|---|---|---|---|
+| Stanje | Choice/Text | Yes | Yes | UNKNOWN |
+| InicijatorEmail | Single line of text | Yes | No | UNKNOWN |
+| TrenutniOdobravalacEmail | Single line of text | Yes | Yes | UNKNOWN |
+| TrenutnaGrupaOdobravanjaId | Single line of text | Yes | Yes | UNKNOWN |
+| TrenutniKorakOdobravanja | Number | Yes | Yes | UNKNOWN |
+| UkupnoKorakaOdobravanja | Number | Yes | No | UNKNOWN |
+| KoraciOdobravanjaJson | Multiple lines of text | Yes | Yes | UNKNOWN |
+| IstorijaOdobravanjaJson | Multiple lines of text | Yes | Yes | UNKNOWN |
+
 ## Pre-conditions checked by flow
 
 | Check | Failure code |
 |---|---|
-| ApprovalSteps item exists | STEP_NOT_FOUND |
-| Step StepStatus is `Pending` | STEP_ALREADY_RESOLVED |
-| Responder is authorized for this step | RESPONDER_NOT_AUTHORIZED |
-| Outcome value is `Approved` or `Rejected` | INVALID_OUTCOME |
+| Document exists in Svi predmeti | DOCUMENT_NOT_FOUND |
+| Stanje is `U odobravanju` | NOT_IN_APPROVAL |
+| KoraciOdobravanjaJson is not empty/null | APPROVAL_STATE_INVALID |
+| Current step status is `Pending` | STEP_ALREADY_RESOLVED |
+| Responder is authorized for current step | RESPONDER_NOT_AUTHORIZED |
+| Outcome is `Approved` or `Rejected` | INVALID_OUTCOME |
 
 ## Authorization check
 
-### User step
-- `assigneeType = "User"`: `responderEmail` must equal `assigneeUserEmail` on the step record.
+**User step** (`TrenutniOdobravalacEmail` is set):
+- `responderEmail` must equal `TrenutniOdobravalacEmail` (case-insensitive).
 
-### Group step
-- `assigneeType = "Group"`: verify that `responderEmail` is a member of `assigneeGroupId`.
-- Action: Office365Groups — List group members. Check that `responderEmail` appears in results.
-- If member check fails (API error): log warning and fall back to allowing response (non-blocking).
-  Flag in audit log for manual review.
+**Group step** (`TrenutnaGrupaOdobravanjaId` is set):
+- Action: Office365Groups — List members of `TrenutnaGrupaOdobravanjaId`.
+- `responderEmail` must appear in the member list.
+- If API fails: log warning, allow response with audit flag.
 
 ## Flow steps
 
@@ -105,131 +116,173 @@ Call `CF_DocCentralV3_LogEvent`:
 - EventCategory: `Approval`
 - Severity: `Info`
 - Status: `Started`
+- DocumentItemId: input `documentItemId`
 - UserEmail: input `responderEmail`
 - CorrelationId: `varCorrelationId`
 - Message: "Obrada odgovora odobravača."
 
-**Step 3 — Read ApprovalSteps item**
+**Step 3 — Read document from Svi predmeti**
 Action: SharePoint — Get item
-List: `EV_DocCentralV3_lstApprovalSteps`
-ID: input `approvalStepItemId`
+ID: input `documentItemId`
 
-If not found: return failure `STEP_NOT_FOUND`.
+If not found: return failure `DOCUMENT_NOT_FOUND`.
 
 Store:
-- `varDocumentItemId` = item `DocumentItemId`
-- `varDelovodniBroj` = item `DelovodniBroj`
-- `varStepNumber` = item `StepNumber`
-- `varStepStatus` = item `StepStatus`
-- `varAssigneeType` = item `AssigneeType`
-- `varAssigneeUserEmail` = item `AssigneeUserEmail`
-- `varAssigneeGroupId` = item `AssigneeGroupId`
-- `varInitiatorEmail` = item `InitiatorEmail`
-- `varStepETag` = item `@odata.etag`
+- `varStanje` = `Stanje` value
+- `varTrenutniKorak` = `TrenutniKorakOdobravanja` value
+- `varUkupnoKoraka` = `UkupnoKorakaOdobravanja` value
+- `varOdobravalacEmail` = `TrenutniOdobravalacEmail` value
+- `varGrupaId` = `TrenutnaGrupaOdobravanjaId` value
+- `varKoraciJson` = `KoraciOdobravanjaJson` value
+- `varIstorijaJson` = `IstorijaOdobravanjaJson` value (default `"[]"` if null)
+- `varInicijatorEmail` = `InicijatorEmail` value
+- `varDelovodniBroj` = `DelovodniBroj` value
+- `varDocETag` = item `@odata.etag`
 
-**Step 4 — Check step is still Pending**
-If `varStepStatus` is not `Pending`: return failure `STEP_ALREADY_RESOLVED`.
-(Race condition guard: two group members respond simultaneously. The second one is rejected here.)
+**Step 4 — Validate Stanje**
+If `varStanje` ≠ `U odobravanju`: return failure `NOT_IN_APPROVAL`.
 
 **Step 5 — Validate outcome**
-If `outcome` is not `"Approved"` or `"Rejected"`: return failure `INVALID_OUTCOME`.
+If `outcome` ≠ `"Approved"` and `outcome` ≠ `"Rejected"`: return failure `INVALID_OUTCOME`.
 
-**Step 6 — Authorize responder**
+**Step 6 — Parse KoraciOdobravanjaJson**
+Parse `varKoraciJson` as JSON array.
+If empty, null, or unparseable: return failure `APPROVAL_STATE_INVALID`.
 
-If `varAssigneeType = "User"`:
-- Check `responderEmail == varAssigneeUserEmail` (case-insensitive).
+Find step where `stepNumber = varTrenutniKorak`.
+If not found: return failure `APPROVAL_STATE_INVALID`.
+Store as `varTrenutniKorakObj`.
+
+**Step 7 — Check step is still Pending**
+If `varTrenutniKorakObj.status` ≠ `"Pending"`: return failure `STEP_ALREADY_RESOLVED`.
+(Race condition guard for group steps.)
+
+**Step 8 — Authorize responder**
+
+If `varOdobravalacEmail` is not empty (user step):
+- Compare `responderEmail` to `varOdobravalacEmail` (toLower).
 - If not equal: return failure `RESPONDER_NOT_AUTHORIZED`.
 
-If `varAssigneeType = "Group"`:
-- Action: Office365Groups — List members of `varAssigneeGroupId`.
-- Check `responderEmail` appears in member list.
-- If not found: return failure `RESPONDER_NOT_AUTHORIZED`.
-- If group member list API call fails: log warning, allow response, flag in audit.
+If `varGrupaId` is not empty (group step):
+- Action: Office365Groups — List members of `varGrupaId`.
+- If `responderEmail` not in member list: return failure `RESPONDER_NOT_AUTHORIZED`.
+- If API fails: log warning and continue with audit flag.
 
-**Step 7 — Mark ApprovalSteps item as resolved (If-Match for race safety)**
-Action: SharePoint HTTP PATCH on ApprovalSteps item
-Header: `If-Match: <varStepETag>`
+**Step 9 — Update current step in KoraciOdobravanjaJson**
+In the parsed JSON array, set on the current step object:
+- `status` = input `outcome`
+- `resolvedBy` = input `responderEmail`
+- `resolvedAt` = `utcNow()`
+- `comments` = input `comments`
 
-Update fields:
-- `StepStatus` = input `outcome` (`Approved` or `Rejected`)
-- `OutcomeByEmail` = input `responderEmail`
-- `OutcomeByDisplayName` = input `responderDisplayName`
-- `OutcomeAt` = `utcNow()`
-- `Comments` = input `comments`
+Re-serialize to `varUpdatedKoraciJson`.
 
-If 412 Precondition Failed: another responder resolved this step simultaneously.
-Return failure `STEP_ALREADY_RESOLVED`.
+**Step 10 — Append to IstorijaOdobravanjaJson**
+Parse `varIstorijaJson` as JSON array.
+Append entry:
+```json
+{
+  "stepNumber": <varTrenutniKorak>,
+  "outcome": "<outcome>",
+  "byEmail": "<responderEmail>",
+  "byName": "<responderDisplayName>",
+  "at": "<utcNow()>",
+  "comments": "<comments>"
+}
+```
+Re-serialize to `varUpdatedIstorijaJson`.
 
 ### Branch on outcome
 
-**Step 8 — If outcome = `Rejected`**
+**Step 11 — If outcome = `Rejected`**
 
-**Step 8a — Update document Stanje to `Odbijeno`**
-Action: SharePoint PATCH on Svi predmeti item `varDocumentItemId`
-Set `Stanje` = `Odbijeno` (UNKNOWN internal name).
+**Step 11a — Mark remaining steps Skipped**
+In `varUpdatedKoraciJson`, set `status = "Skipped"` on all steps where `stepNumber > varTrenutniKorak`.
 
-**Step 8b — Mark remaining Pending steps as Skipped**
-Action: SharePoint — Get items from ApprovalSteps where `DocumentItemId = varDocumentItemId` AND `StepStatus = Pending`.
-For each: PATCH to set `StepStatus = Skipped`.
+**Step 11b — Build PATCH body**
+- `Stanje` = `Odbijeno`
+- `TrenutniOdobravalacEmail` = `""`
+- `TrenutnaGrupaOdobravanjaId` = `""`
+- `KoraciOdobravanjaJson` = updated JSON
+- `IstorijaOdobravanjaJson` = updated history JSON
 
-**Step 8c — Notify initiator of rejection**
-Action: Outlook — Send email to `varInitiatorEmail`.
-Subject: `concat("DocCentral: Dokument odbijen - ", varDelovodniBroj)`
-Body: Include `responderDisplayName`, `comments`, and instruction to review and resubmit.
+**Step 11c — Set `varNextAction = "DocumentRejected"`**
 
-**Step 8d — Set `varNextAction` = `"DocumentRejected"`**
+**Step 12 — If outcome = `Approved`**
 
-**Step 9 — If outcome = `Approved`**
+**Step 12a — Check for next step**
+Next step number = `varTrenutniKorak + 1`.
+Find step in updated JSON with `stepNumber = varTrenutniKorak + 1` and `status = "Pending"`.
 
-**Step 9a — Look for next pending step**
-Action: SharePoint — Get items from ApprovalSteps
-Filter: `DocumentItemId = varDocumentItemId` AND `StepNumber = (varStepNumber + 1)` AND `StepStatus = Pending`
-Top: 1
+**Step 12b — Next step exists (sequential approval continues)**
+Store `varNaredniKorak` = next step object.
 
-**Step 9b — If next step found: activate it**
+Build PATCH body:
+- `TrenutniKorakOdobravanja` = `varTrenutniKorak + 1`
+- `TrenutniOdobravalacEmail` = `varNaredniKorak.assigneeEmail` (or `""` if group)
+- `TrenutnaGrupaOdobravanjaId` = `varNaredniKorak.assigneeGroupId` (or `""` if user)
+- `KoraciOdobravanjaJson` = updated JSON
+- `IstorijaOdobravanjaJson` = updated history JSON
+- `Stanje` = unchanged (`U odobravanju`)
 
-Resolve notification recipients (same logic as `CF_DocCentralV3_SendForApproval` Step 7a):
-- If User: recipient = [`nextStep.AssigneeUserEmail`]
-- If Group: resolve group members
+**Step 12c — No next step (all steps approved)**
+Build PATCH body:
+- `Stanje` = `Odobreno`
+- `TrenutniOdobravalacEmail` = `""`
+- `TrenutnaGrupaOdobravanjaId` = `""`
+- `KoraciOdobravanjaJson` = updated JSON
+- `IstorijaOdobravanjaJson` = updated history JSON
 
-Grant next approver(s) access:
-Call `CF_DocCentralV3_AssignPermissions`:
-- `additionalUserEmails` or `additionalGroupIds` set to next step's assignee
-- `sviPredmetiItemId`: `varDocumentItemId`
-- other fields as appropriate
+Set `varNextAction = "ProcessComplete"`.
 
-Send notification email to next step recipients (same template as SendForApproval).
+### Write outcome to Svi predmeti
 
-Update next step item: `NotificationSent = true`.
+**Step 13 — PATCH Svi predmeti item (If-Match)**
+Action: SharePoint HTTP PATCH
+Header: `If-Match: <varDocETag>`
+Body: PATCH body from Step 11b, 12b, or 12c.
 
-Set `varNextAction` = `"NextStepActivated"`.
+If 412 Precondition Failed:
+- Re-read item. Check if step already resolved.
+- If yes: return failure `STEP_ALREADY_RESOLVED`.
+- Otherwise: retry once with fresh ETag.
 
-**Step 9c — If no next step found: all steps approved**
+If update fails: return failure `STATUS_UPDATE_FAILED`.
 
-Update document `Stanje` = `Odobreno` (UNKNOWN internal name).
+### Post-outcome actions
 
-Notify initiator of full approval:
-Action: Outlook — Send email to `varInitiatorEmail`.
-Subject: `concat("DocCentral: Dokument odobren - ", varDelovodniBroj)`
+**Step 14 — If NextStepActivated: activate next step**
+Resolve recipients for `varNaredniKorak`:
+- User step: [`varNaredniKorak.assigneeEmail`]
+- Group step: Office365Groups — List members → extract emails.
 
-Set `varNextAction` = `"ProcessComplete"`.
+Grant next approver access via `CF_DocCentralV3_AssignPermissions` (non-fatal).
+Send notification email to next step recipients (non-fatal).
 
-### Finalization
+**Step 15 — If ProcessComplete or DocumentRejected: notify initiator**
+Action: Outlook — Send email to `varInicijatorEmail`.
 
-**Step 10 — Log Success**
+If ProcessComplete:
+- Subject: `concat("DocCentral: Dokument odobren - ", varDelovodniBroj)`
+
+If DocumentRejected:
+- Subject: `concat("DocCentral: Dokument odbijen - ", varDelovodniBroj)`
+- Body includes: responder name, comments, instruction to review and resubmit.
+
+Email failure is non-fatal. Log warning.
+
+**Step 16 — Log Success**
 Call `CF_DocCentralV3_LogEvent`:
 - EventType: `ProcessApprovalResponse`
-- EventCategory: `Approval`
 - Severity: `Info`
 - Status: `Success`
-- DocumentItemId: `varDocumentItemId`
+- DocumentItemId: input `documentItemId`
 - DelovodniBroj: `varDelovodniBroj`
 - UserEmail: input `responderEmail`
 - CorrelationId: `varCorrelationId`
-- Message: `concat("Odgovor ", outcome, " zabeležen za korak ", string(varStepNumber), " dokumenta ", varDelovodniBroj, ".")`
+- Message: `concat("Korak ", string(varTrenutniKorak), " - ", outcome, " od strane ", responderEmail, ". Sledeća akcija: ", varNextAction, ".")`
 
-**Step 11 — Return success response**
-Include `varNextAction` in response.
+**Step 17 — Return success response** (include `varNextAction`)
 
 ### Catch scope
 
@@ -237,57 +290,54 @@ Call `CF_DocCentralV3_LogEvent`:
 - EventType: `ProcessApprovalResponse`
 - Severity: `Error`
 - Status: `Failed`
-- ErrorCode: derived from failure point
 - CorrelationId: `varCorrelationId`
 
 Return failure response.
 
 ## Stanje transition rules
 
-| Current Stanje | Outcome | New Stanje |
-|---|---|---|
-| U odobravanju | Approved + more steps remain | U odobravanju (unchanged) |
-| U odobravanju | Approved + no more steps | Odobreno |
-| U odobravanju | Rejected | Odbijeno |
+| Trigger | New Stanje |
+|---|---|
+| Approved, next step exists | U odobravanju (unchanged) |
+| Approved, no next step | Odobreno |
+| Rejected | Odbijeno |
 
-## After rejection — resubmit path (Canvas App responsibility)
+## Resubmission after rejection
 
-After rejection:
-- Initiator receives notification.
-- Initiator may edit document metadata in Canvas App.
-- Initiator may call `CF_DocCentralV3_SendForApproval` again.
-- `SendForApproval` validates that `Stanje = Odbijeno` is an allowed starting state for a new approval (not blocked, unlike `Arhivirano`).
+Initiator calls `CF_DocCentralV3_SendForApproval` again after rejection.
+`SendForApproval` validates that `Stanje = Odbijeno` is a valid starting state (allowed).
+It resets `KoraciOdobravanjaJson` and appends to `IstorijaOdobravanjaJson`.
 
 ## Error codes
 
 | Code | Meaning |
 |---|---|
-| STEP_NOT_FOUND | ApprovalSteps item does not exist |
-| STEP_ALREADY_RESOLVED | Step is no longer Pending (race condition) |
-| RESPONDER_NOT_AUTHORIZED | Responder is not the assigned approver for this step |
-| INVALID_OUTCOME | Outcome value is not Approved or Rejected |
-| STATUS_UPDATE_FAILED | Could not update Svi predmeti Stanje |
+| DOCUMENT_NOT_FOUND | Document item not found in Svi predmeti |
+| NOT_IN_APPROVAL | Document Stanje is not U odobravanju |
+| APPROVAL_STATE_INVALID | KoraciOdobravanjaJson is empty, null, or unparseable |
+| STEP_ALREADY_RESOLVED | Current step is no longer Pending |
+| RESPONDER_NOT_AUTHORIZED | Responder is not the assigned approver |
+| INVALID_OUTCOME | Outcome is not Approved or Rejected |
+| STATUS_UPDATE_FAILED | Could not PATCH Svi predmeti item |
 
 ## Open items
 
 | Item | Status |
 |---|---|
-| ApprovalSteps list EV logical name | UNKNOWN |
-| Svi predmeti Stanje internal column name | UNKNOWN |
-| ApprovalSteps StepStatus internal column name | UNKNOWN |
-| Email body templates | UNKNOWN |
-| Whether permission is revoked from rejected approver | UNKNOWN — decide: revoke Read or retain for audit |
-| Whether Odbijeno → SendForApproval is explicitly allowed | To confirm from process docs — assumed yes |
+| Internal column names for all Svi predmeti approval fields | UNKNOWN — display names confirmed |
+| Email body templates (approval, rejection) | UNKNOWN |
+| Permission retention policy for previous approvers | UNKNOWN — App Config key |
 
 ## Test scenarios
 
 | Scenario | Expected result |
 |---|---|
-| User approves, single step | Stanje = Odobreno, initiator notified |
-| User approves, step 1 of 2 | Stanje unchanged, step 2 activated |
-| User rejects | Stanje = Odbijeno, remaining steps Skipped, initiator notified |
-| Group step, first member approves | Step resolved, next step activated or process complete |
-| Group step, second member tries to approve | STEP_ALREADY_RESOLVED returned |
+| User approves, single step | Stanje = Odobreno, InicijatorEmail notified |
+| User approves, step 1 of 2 | Stanje unchanged, step 2 activated, step 2 notified |
+| User rejects | Stanje = Odbijeno, remaining steps Skipped, InicijatorEmail notified |
+| Group step, first member approves | Step resolved, next activated or process complete |
+| Group step, second member tries | STEP_ALREADY_RESOLVED (ETag + KoraciOdobravanjaJson status check) |
 | Wrong user tries to approve | RESPONDER_NOT_AUTHORIZED |
-| ApprovalSteps item not found | STEP_NOT_FOUND |
-| Race condition on ETag update | 412 handled as STEP_ALREADY_RESOLVED |
+| Document not in U odobravanju | NOT_IN_APPROVAL |
+| KoraciOdobravanjaJson null/corrupt | APPROVAL_STATE_INVALID |
+| PATCH 412 conflict | Re-read, detect already resolved, return STEP_ALREADY_RESOLVED |

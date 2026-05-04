@@ -183,7 +183,7 @@ Mapped fields (internal column names UNKNOWN for unlisted fields — use documen
 | Stanje | `Zavedeno` | UNKNOWN |
 | DocumentType | input `documentType` | UNKNOWN |
 | FilingDate | `varFilingDate` | UNKNOWN |
-| InitiatorEmail | input `initiatorEmail` | UNKNOWN |
+| InicijatorEmail | input `initiatorEmail` | UNKNOWN |
 | PartnerId | input `metadata.partnerId` | UNKNOWN |
 | PartnerNazivSnapshot | input `metadata.partnerNaziv` | UNKNOWN |
 | PartnerPIBSnapshot | input `metadata.partnerPIBSnapshot` | UNKNOWN |
