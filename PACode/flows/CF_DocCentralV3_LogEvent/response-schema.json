@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_LogEvent_Response",
+  "title": "CF_DocCentralV3_LogEvent — Response Schema",
+  "description": "Output returned by CF_DocCentralV3_LogEvent to the calling flow or Canvas App. The flow always returns a structured response — it never throws an unhandled exception to the caller.",
+
+  "oneOf": [
+    {
+      "title": "Success response",
+      "description": "Returned when the AuditLog item was successfully created.",
+      "type": "object",
+      "required": ["success", "auditLogItemId", "correlationId"],
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "const": true
+        },
+        "auditLogItemId": {
+          "type": "integer",
+          "description": "SharePoint item ID of the newly created AuditLog record.",
+          "minimum": 1
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "The correlation ID used for this log entry (either the input value or a newly generated GUID)."
+        },
+        "message": {
+          "type": "string",
+          "description": "Optional. Empty string on success.",
+          "default": ""
+        }
+      }
+    },
+    {
+      "title": "Failure response",
+      "description": "Returned when the AuditLog write failed. The calling flow must treat this as non-fatal — it must continue its primary operation even if logging fails.",
+      "type": "object",
+      "required": ["success", "message", "correlationId"],
+      "properties": {
+        "success": {
+          "type": "boolean",
+          "const": false
+        },
+        "auditLogItemId": {
+          "type": "integer",
+          "description": "Always 0 on failure.",
+          "const": 0
+        },
+        "message": {
+          "type": "string",
+          "const": "Audit log write failed."
+        },
+        "correlationId": {
+          "type": "string",
+          "description": "The correlation ID, if it was resolved before the failure."
+        }
+      }
+    }
+  ],
+
+  "examples": [
+    {
+      "success": true,
+      "auditLogItemId": 142,
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "message": ""
+    },
+    {
+      "success": false,
+      "auditLogItemId": 0,
+      "message": "Audit log write failed.",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+    }
+  ],
+
+  "callerGuidance": {
+    "description": "How calling flows must handle this response.",
+    "rules": [
+      "Do NOT throw or terminate the parent flow if success = false.",
+      "Log the failure locally if possible (e.g. store in a variable for the run record).",
+      "Continue the primary operation regardless of the logging outcome.",
+      "Never call CF_DocCentralV3_LogEvent from within its own Catch scope — this would cause an infinite loop.",
+      "If auditLogItemId is needed for correlation, store it in a flow variable after a successful call."
+    ]
+  },
+
+  "powerAutomateOutputDefinition": {
+    "description": "Output parameters to define in the Respond to a PowerApp or flow action.",
+    "outputs": [
+      {
+        "name": "success",
+        "type": "boolean",
+        "description": "True if the log entry was created, false if the write failed."
+      },
+      {
+        "name": "auditLogItemId",
+        "type": "integer",
+        "description": "SharePoint item ID of the created AuditLog record. 0 on failure."
+      },
+      {
+        "name": "correlationId",
+        "type": "string",
+        "description": "Correlation ID used for this entry."
+      },
+      {
+        "name": "message",
+        "type": "string",
+        "description": "Error message on failure. Empty string on success."
+      }
+    ]
+  }
+}

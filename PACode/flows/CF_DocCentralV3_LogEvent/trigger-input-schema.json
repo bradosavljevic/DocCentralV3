@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "CF_DocCentralV3_LogEvent_TriggerInput",
+  "title": "CF_DocCentralV3_LogEvent — Power Apps V2 Trigger Input Schema",
+  "description": "Input parameters for the CF_DocCentralV3_LogEvent child flow. All fields map directly to AuditLog SharePoint list columns. Pass only the fields relevant to the event being logged.",
+  "type": "object",
+  "required": [
+    "eventType",
+    "eventCategory",
+    "severity",
+    "status",
+    "source",
+    "message"
+  ],
+  "properties": {
+    "eventType": {
+      "type": "string",
+      "description": "Type of the audit event. Must be a valid AuditLog EventType choice value.",
+      "enum": [
+        "CreateDocument",
+        "GenerateRegistryNumber",
+        "UseReservedNumber",
+        "ArchiveDocument",
+        "CloseRegistryYear",
+        "SendForApproval",
+        "ProcessApprovalResponse",
+        "SendReminder",
+        "GenerateArchiveBookPdf",
+        "PermissionAssignment",
+        "PowerAutomateError",
+        "ValidationError",
+        "SystemError"
+      ]
+    },
+    "eventCategory": {
+      "type": "string",
+      "description": "Category grouping for the event.",
+      "enum": [
+        "Document",
+        "RegistryNumber",
+        "ReservedNumber",
+        "Approval",
+        "Reminder",
+        "Archive",
+        "YearClosing",
+        "Permission",
+        "Partner",
+        "System"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "description": "Severity level of the event.",
+      "enum": [
+        "Info",
+        "Warning",
+        "Error",
+        "Critical"
+      ],
+      "default": "Info"
+    },
+    "status": {
+      "type": "string",
+      "description": "Outcome or lifecycle status of the operation being logged.",
+      "enum": [
+        "Started",
+        "Success",
+        "Failed",
+        "Retried",
+        "Skipped"
+      ],
+      "default": "Started"
+    },
+    "correlationId": {
+      "type": "string",
+      "description": "Correlation ID linking all log entries for a single flow run or operation. If empty, the flow generates a new GUID.",
+      "default": ""
+    },
+    "flowName": {
+      "type": "string",
+      "description": "Internal name of the calling flow. Used for diagnostics.",
+      "default": ""
+    },
+    "flowRunId": {
+      "type": "string",
+      "description": "Power Automate run ID of the calling flow run. Use workflow().run.name expression in the caller.",
+      "default": ""
+    },
+    "source": {
+      "type": "string",
+      "description": "System component originating the event.",
+      "enum": [
+        "CanvasApp",
+        "CloudFlow",
+        "SharePoint",
+        "System"
+      ],
+      "default": "CloudFlow"
+    },
+    "userEmail": {
+      "type": "string",
+      "description": "Email address of the user who triggered the operation.",
+      "default": ""
+    },
+    "userDisplayName": {
+      "type": "string",
+      "description": "Display name of the user who triggered the operation.",
+      "default": ""
+    },
+    "documentItemId": {
+      "type": "integer",
+      "description": "SharePoint item ID from Svi predmeti. Pass 0 if not applicable.",
+      "default": 0
+    },
+    "delovodniBroj": {
+      "type": "string",
+      "description": "Registry number of the document being processed.",
+      "default": ""
+    },
+    "reservedNumberId": {
+      "type": "integer",
+      "description": "SharePoint item ID from RezervisaniBrojevi. Pass 0 if not applicable.",
+      "default": 0
+    },
+    "partnerId": {
+      "type": "integer",
+      "description": "SharePoint item ID from Partneri. Pass 0 if not applicable.",
+      "default": 0
+    },
+    "message": {
+      "type": "string",
+      "description": "Human-readable description of the event. Required. Written to the AuditLog Message column (multiple lines of text)."
+    },
+    "detailsJson": {
+      "type": "string",
+      "description": "Technical details as a JSON string. Written to DetailsJson (multiple lines of text). No length limit.",
+      "default": ""
+    },
+    "errorCode": {
+      "type": "string",
+      "description": "Application-level error code (e.g. REGISTRY_NUMBER_GENERATION_FAILED). Max 255 chars.",
+      "default": ""
+    },
+    "errorMessage": {
+      "type": "string",
+      "description": "Full error message from the failed action. Written to ErrorMessage (multiple lines of text). No length limit.",
+      "default": ""
+    },
+    "requestPayloadJson": {
+      "type": "string",
+      "description": "Serialized JSON of the input payload that triggered the operation. Written to RequestPayloadJson (multiple lines of text).",
+      "default": ""
+    },
+    "responsePayloadJson": {
+      "type": "string",
+      "description": "Serialized JSON of the response returned by the operation. Written to ResponsePayloadJson (multiple lines of text).",
+      "default": ""
+    }
+  },
+  "examples": [
+    {
+      "eventType": "CreateDocument",
+      "eventCategory": "Document",
+      "severity": "Info",
+      "status": "Started",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "flowName": "CF_DocCentralV3_CreateDocument",
+      "flowRunId": "",
+      "source": "CloudFlow",
+      "userEmail": "korisnik@organizacija.rs",
+      "userDisplayName": "Korisnik Prezime",
+      "documentItemId": 0,
+      "delovodniBroj": "",
+      "reservedNumberId": 0,
+      "partnerId": 0,
+      "message": "Pokretanje zavođenja dokumenta.",
+      "detailsJson": "",
+      "errorCode": "",
+      "errorMessage": "",
+      "requestPayloadJson": "",
+      "responsePayloadJson": ""
+    },
+    {
+      "eventType": "PowerAutomateError",
+      "eventCategory": "System",
+      "severity": "Error",
+      "status": "Failed",
+      "correlationId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "flowName": "CF_DocCentralV3_CreateDocument",
+      "flowRunId": "08585123456789",
+      "source": "CloudFlow",
+      "userEmail": "korisnik@organizacija.rs",
+      "userDisplayName": "Korisnik Prezime",
+      "documentItemId": 0,
+      "delovodniBroj": "",
+      "reservedNumberId": 0,
+      "partnerId": 0,
+      "message": "Dokument nije zaveden. Greška pri kreiranju itema u Svi predmeti.",
+      "detailsJson": "{\"actionName\":\"Create_item\",\"code\":\"InvalidRequest\"}",
+      "errorCode": "CREATE_DOCUMENT_FAILED",
+      "errorMessage": "The request is invalid.",
+      "requestPayloadJson": "",
+      "responsePayloadJson": ""
+    }
+  ]
+}
