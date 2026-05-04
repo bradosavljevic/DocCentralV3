@@ -1,79 +1,70 @@
 # Test matrica
 
-## 1. Unos novog dokumenta
+## Unos dokumenta
 
-| ID | Scenario | Očekivani rezultat |
-|---|---|---|
-| T-001 | Korisnik zavodi dokument sa sledećim brojem | Dokument kreiran, broj dodeljen, brojač uvećan |
-| T-002 | Korisnik zavodi dokument sa rezervisanim brojem | Dokument kreiran, rezervisani broj obrisan |
-| T-003 | Nedostaje obavezno polje | Sistem prikazuje validacionu grešku |
-| T-004 | Nedostaje prilog | Sistem prikazuje validacionu grešku |
-| T-005 | Godina je zaključana | Zavođenje nije dozvoljeno |
-| T-006 | Dva korisnika istovremeno kliknu Zavedi | Dokumenti dobijaju različite delovodne brojeve |
+| Scenario | Očekivani rezultat |
+|---|---|
+| Korisnik zavodi dokument sa novim brojem | Dokument dobija unikatan delovodni broj |
+| Korisnik zavodi dokument sa rezervisanim brojem | Rezervisani broj se koristi i uklanja iz liste |
+| Dva korisnika istovremeno zavode dokument | Svaki dokument dobija različit broj |
+| Korisnik doda prilog | Prilog se kreira u root biblioteke i povezuje metapodacima |
+| Fajl ima isto originalno ime kao postojeći | Ne dolazi do overwrite-a |
+| Nedostaje obavezno polje | Dokument se ne zavodi, korisnik dobija poruku |
 
-## 2. Rezervisani brojevi
+## Odobravanje
 
-| ID | Scenario | Očekivani rezultat |
-|---|---|---|
-| T-010 | Korisnik kreira rezervisani broj | Broj kreiran |
-| T-011 | Korisnik menja rezervisani broj | Broj izmenjen |
-| T-012 | Korisnik pokušava ručno da obriše rezervisani broj | Brisanje nije dozvoljeno |
-| T-013 | Rezervisani broj se koristi kod zavođenja | Broj se briše nakon uspešnog zavođenja |
-| T-014 | Kreiranje dokumenta ne uspe | Rezervisani broj ostaje u listi |
+| Scenario | Očekivani rezultat |
+|---|---|
+| Dokument ide jednom korisniku | Korisnik vidi dokument za odobrenje |
+| Dokument ide sekvencijalno | Sledeći odobravač dobija dokument tek nakon prethodnog |
+| Approval ide grupi | Prvi koji odobri završava korak |
+| Dokument je odbijen | Status postaje `Odbijeno` i vraća se inicijatoru |
+| Inicijator ponovo šalje dokument | Proces odobravanja se ponovo pokreće |
 
-## 3. Odobravanje
+## Arhiviranje
 
-| ID | Scenario | Očekivani rezultat |
-|---|---|---|
-| T-020 | Dokument ide jednom korisniku | Korisnik vidi dokument za odobravanje |
-| T-021 | Sekvencijalno odobravanje | Sledeći korisnik dobija tek nakon prethodnog |
-| T-022 | Odobravanje na grupu | Prvi koji odobri završava korak |
-| T-023 | Odbijanje | Status Odbijeno, dokument se vraća inicijatoru |
-| T-024 | Inicijator ponovo pokreće approval | Kreira se novi approval proces |
+| Scenario | Očekivani rezultat |
+|---|---|
+| Dokument je `Zavedeno` | Može se arhivirati |
+| Dokument nije `Zavedeno` | Ne može direktno u arhivu |
+| Arhiviranje uspešno | Status postaje `Arhivirano` |
+| Arhiviranje neuspešno | Greška se loguje |
 
-## 4. Podsetnici
+## Zaključenje godine
 
-| ID | Scenario | Očekivani rezultat |
-|---|---|---|
-| T-030 | Korisnik kreira podsetnik za sebe | Podsetnik kreiran |
-| T-031 | Korisnik kreira podsetnik za više korisnika | Svi primaoci dobijaju email |
-| T-032 | Dan podsetnika | Email se šalje u 08:00 |
-| T-033 | Podsetnik već poslat | Ne šalje se ponovo |
-| T-034 | Korisnik briše podsetnik | Email se ne šalje |
+| Scenario | Očekivani rezultat |
+|---|---|
+| Svi dokumenti su `Arhivirano`, nema rezervisanih brojeva | Godina se zaključuje |
+| Postoji dokument koji nije `Arhivirano` | Zaključenje nije dozvoljeno |
+| Postoji rezervisani broj | Zaključenje nije dozvoljeno |
+| Godina je zaključana | Nikada se ne može otključati |
+| Zaključenje uspešno | Kreira se nova delovodna knjiga i menja aktivna godina |
 
-## 5. Arhiviranje
+## Partneri
 
-| ID | Scenario | Očekivani rezultat |
-|---|---|---|
-| T-040 | Arhiviranje dokumenta u statusu Zavedeno | Status postaje Arhivirano |
-| T-041 | Arhiviranje dokumenta koji nije Zavedeno | Sistem odbija operaciju |
-| T-042 | Dodela arhivskog znaka | Arhivski znak upisan |
-| T-043 | Generisanje Arhivske knjige PDF | PDF kreiran |
+| Scenario | Očekivani rezultat |
+|---|---|
+| Kreiranje partnera | Partner je dostupan za izbor |
+| Izmena partnera | Novi podaci su dostupni za buduće dokumente |
+| Brisanje partnera | Partner više nije dostupan za izbor |
+| Pregled starog dokumenta | Istorijski podaci partnera ostaju vidljivi |
 
-## 6. Zaključenje godine
+## Podsetnici
 
-| ID | Scenario | Očekivani rezultat |
-|---|---|---|
-| T-050 | Svi dokumenti su Arhivirano i nema rezervisanih brojeva | Godina zaključana |
-| T-051 | Postoji dokument koji nije Arhivirano | Zaključenje odbijeno |
-| T-052 | Postoji rezervisani broj | Zaključenje odbijeno |
-| T-053 | Nakon zaključenja pokušaj zavođenja u staroj godini | Nije dozvoljeno |
-| T-054 | Pokušaj otključavanja godine | Nije dozvoljeno |
+| Scenario | Očekivani rezultat |
+|---|---|
+| Korisnik kreira podsetnik za sebe | Email se šalje na datum podsetnika |
+| Korisnik kreira podsetnik za više korisnika | Svi primaoci dobijaju email |
+| Podsetnik se menja | Koristi se nova vrednost |
+| Podsetnik se briše | Email se ne šalje |
+| Dan podsetnika je stigao | Email se šalje u 08:00 ili prema konfiguraciji |
 
-## 7. Partneri
+## Audit
 
-| ID | Scenario | Očekivani rezultat |
-|---|---|---|
-| T-060 | Kreiranje partnera | Partner kreiran |
-| T-061 | Izmena partnera | Partner izmenjen |
-| T-062 | Brisanje/deaktivacija partnera | Partner nedostupan za nove dokumente |
-| T-063 | Istorijski dokument sa obrisanim partnerom | Istorija ostaje vidljiva |
-
-## 8. Security
-
-| ID | Scenario | Očekivani rezultat |
-|---|---|---|
-| T-070 | Korisnik bez prava otvara dokument | Nema pristup |
-| T-071 | Korisnik sa pravom otvara dokument | Ima Read pristup |
-| T-072 | Korisnik pokušava direktan edit SharePoint item-a | Nema Write pristup |
-| T-073 | Flow kreira dokument | Uspelo preko service account-a |
+| Scenario | Očekivani rezultat |
+|---|---|
+| Neuspešno kreiranje dokumenta | Upis u AuditLog |
+| Uspešno generisan broj | Upis u AuditLog |
+| Neuspešno generisanje broja | Upis u AuditLog |
+| Korišćen rezervisani broj | Upis u AuditLog |
+| Flow greška | Upis u AuditLog |

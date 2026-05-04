@@ -1,52 +1,59 @@
 # SharePoint lista: App Config
 
-## Svrha
+## Environment variable
 
-App Config sadrži šifarnike i konfiguracije koje aplikacija koristi u runtime-u.
+```text
+EV_DocCentralV3_lstAppConfig
+```
 
-Dostavljeni AppConfig.csv predstavlja osnovu za konačnu listu šifarnika i vrednosti.
+Logical name:
 
-## Tipovi konfiguracija
+```text
+gpdoccen_EV_DocCentralV3_lstAppConfig
+```
 
-App Config može sadržati:
+## Namena
 
-- tipove dokumenata
-- statuse
-- procesne konfiguracije
+`App Config` sadrži šifarnike i konfiguracije koje aplikacija koristi.
+
+## Primeri konfiguracija
+
 - delovodne knjige
-- aktivnu godinu
-- arhivske znakove
-- konfiguracije podsetnika
-- konfiguracije odobravanja
-- organizacione jedinice
-- tekstove i prevode
-- vidljivost polja
-- validaciona pravila
-- konfiguraciju Entra grupa po klijentu
+- aktivna godina
+- tipovi dokumenata
+- procesne konfiguracije
+- statusi
+- arhivski znaci
+- vreme slanja podsetnika
+- konfiguracija odobravanja
+- konfiguracija rola i grupa
+- konfiguracija vidljivosti polja
+- lokalizacija ako postoji
 
-## Delovodne knjige
+## Važno
 
-App Config / Delovodne knjige sadrži sledeći delovodni broj i godinu.
+Konačna lista šifarnika i vrednosti data je kroz `AppConfig.csv`.
 
-Pravila:
-
-- aktivna godina se menja kod zaključenja godine
-- zaključana godina se ne može ponovo otvoriti
-- za novu godinu kreira se nova delovodna knjiga
-- generisanje broja mora biti concurrency-safe
+Claude Code mora tretirati App Config kao izvor konfiguracije, ne kao hardcoded vrednosti.
 
 ## ProcesConfig
 
-ProcesConfig može definisati:
+Kroz `ProcesConfig` klijent može definisati svoje statuse i procesne korake.
 
-- statuse
-- tokove statusa
-- approval korake
-- tipove dokumenata
-- pravila vidljivosti
-- obavezna polja
-- korisnike/grupe za odobravanje
+Osnovni statusi ostaju:
 
-## Napomena
+```text
+Zavedeno
+U odobravanju
+Odobreno
+Odbijeno
+Arhivirano
+```
 
-Claude Code mora koristiti App Config kao konfiguracioni layer i izbegavati hardkodovane vrednosti gde god je moguće.
+## Delovodne knjige
+
+U App Config postoje delovodne knjige.
+
+One sadrže aktivnu godinu i sledeći delovodni broj.
+
+Kod zaključenja godine kreira se nova delovodna knjiga za sledeću godinu i menja se aktivna godina.

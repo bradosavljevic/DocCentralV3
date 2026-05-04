@@ -1,53 +1,36 @@
 # SharePoint lista: Partneri
 
-## Svrha
+## Environment variable
 
-Lista poslovnih partnera koji se koriste kod zavođenja dokumenata.
+```text
+EV_DocCentralV3_lstPartneri
+```
 
-Partneri su zasebna stavka u meniju i nisu deo Administracije.
+Logical name:
 
-## Funkcionalnosti
+```text
+gpdoccen_EV_DocCentralV3_lstPartneri
+```
 
-Korisnik koji zavodi dokumente može da:
+## Namena
 
-- kreira partnera
-- menja partnera
-- briše partnera
-- pregleda partnera
+Lista `Partneri` sadrži poslovne partnere koji se biraju pri zavođenju dokumenata.
 
-## Očekivana polja
+## Funkcionalnost
 
-Tačna interna imena proveriti iz XML/solution exporta.
+Korisnik koji zavodi dokumente može:
 
-Očekivana polja:
+- kreirati partnera
+- menjati partnera
+- brisati partnera
+- pregledati partnera
 
-- ID
-- Title
-- PoslovnoIme
-- PIB
-- MB
-- Mesto
-- Adresa
-- Email
-- Telefon
-- IsActive
-- Created
-- Modified
-- Author
-- Editor
+## Važno pravilo za brisanje
 
-## Pravilo istorije
+Brisanje partnera ne sme uticati na već zavedene dokumente.
 
-Brisanje partnera ne sme uticati na istorijske dokumente.
+Ako se partner obriše ili deaktivira, istorijski dokumenti u `Svi predmeti` moraju i dalje prikazivati podatke o partneru.
 
-Dokumenti u listi Svi predmeti moraju zadržati partner history.
+## Preporuka
 
-Preporuka:
-
-- u dokument upisati denormalizovane partner podatke
-- koristiti soft delete kada je moguće
-- ne dozvoliti izbor obrisanog/deaktiviranog partnera za novi dokument
-
-## Logging
-
-Logovati neuspešne operacije nad partnerima.
+U `Svi predmeti` čuvati snapshot vrednosti partnera, ne oslanjati se samo na lookup.

@@ -1,37 +1,43 @@
-# SharePoint lista: Rezervisani Brojevi
+# SharePoint lista: Rezervisani brojevi
 
-## Svrha
+## Environment variable
 
-Lista služi za evidenciju unapred rezervisanih delovodnih brojeva.
+```text
+EV_DocCentralV3_lstRezervisaniBrojevi
+```
+
+Logical name:
+
+```text
+gpdoccen_EV_DocCentralV3_lstRezervisaniBrojevi
+```
+
+## Namena
+
+Lista čuva rezervisane delovodne brojeve.
 
 ## Pravila
 
-- Kreiraju je korisnici koji zavode dokumente.
-- Rezervisani broj može se izmeniti.
-- Rezervisani broj se ne može ručno obrisati nakon rezervacije.
-- Briše se automatski kada se iskoristi.
-- Važi samo za jednu godinu.
-- Može se koristiti za bilo koji tip dokumenta.
+- Rezervisani broj kreira korisnik koji zavodi dokumente.
+- Rezervisani broj može menjati korisnik koji zavodi dokumente.
+- Nakon rezervacije, rezervisani broj se ne može ručno obrisati.
+- Rezervisani broj se briše automatski tek kada se iskoristi.
+- Rezervisani broj važi samo za jednu godinu.
+- Rezervisani broj može se iskoristiti za bilo koji tip dokumenta.
 - Svi korisnici koji zavode dokumente vide sve rezervisane brojeve.
-- Lista mora biti prazna pre zaključenja godine.
 
-## Očekivana polja
+## Korišćenje rezervisanog broja
 
-- ID
-- Title
-- DelovodniBroj
-- Godina
-- DatumRezervacije
-- DatumZavodjenja
-- Rezervisao
-- Napomena
-- Created
-- Modified
-- Author
-- Editor
+Kada korisnik izabere rezervisani broj:
 
-## Implementacija
+1. bira datum zavođenja
+2. sistem proverava validnost broja
+3. sistem kreira dokument
+4. sistem briše rezervisani broj nakon uspešnog zavođenja
+5. sistem loguje korišćenje rezervisanog broja
 
-Korišćenje rezervisanog broja mora biti transakciono u okviru flow-a za zavođenje dokumenta.
+## Flow
 
-Ako kreiranje dokumenta ne uspe, rezervisani broj se ne sme obrisati.
+```text
+CF_DocCentralV3_UseReservedNumber
+```

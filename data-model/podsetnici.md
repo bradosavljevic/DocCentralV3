@@ -1,35 +1,32 @@
 # SharePoint lista: Podsetnici
 
-## Svrha
+## Environment variable
 
-Lista za čuvanje korisničkih podsetnika.
+```text
+EV_DocCentralV3_lstPodsetnici
+```
 
-## Poslovna pravila
+Logical name:
 
-- Korisnik može kreirati podsetnik za sebe.
-- Korisnik može kreirati podsetnik za jednog ili više drugih korisnika.
-- Podsetnik može biti vezan za dokument/predmet.
-- Email se šalje jednom.
-- Email se šalje na datum podsetnika u 08:00.
-- Korisnik ne bira individualno vreme slanja.
-- Korisnik može menjati i brisati podsetnik.
-- Ne postoji poslovni status Aktivan/Poslat/Otkazan.
+```text
+gpdoccen_EV_DocCentralV3_lstPodsetnici
+```
 
-## Preporučena polja
+## Namena
 
-- ID
-- Title
-- DokumentId
-- DelovodniBroj
-- ReminderDate
-- Recipients
-- CreatedByUser
-- Message
-- InternalSentFlag
-- SentOn
-- Created
-- Modified
+Lista čuva podsetnike koje korisnik kreira za sebe ili druge korisnike.
 
-## Napomena
+## Pravila
 
-InternalSentFlag je tehničko polje, ne poslovni status.
+- Podsetnik šalje email jednom.
+- Podsetnik se šalje na datum definisan u podsetniku.
+- Podrazumevano vreme slanja je 08:00.
+- Vreme slanja je sistemska konfiguracija, nije individualno po podsetniku.
+- Korisnik može menjati i brisati podsetnike.
+- Podsetnik može biti za jednog ili više korisnika.
+
+## Flow
+
+```text
+CF_DocCentralV3_SendReminders
+```

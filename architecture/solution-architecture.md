@@ -1,66 +1,87 @@
-# Arhitektura rešenja
+# DocCentralV3 - arhitektura rešenja
 
-## Platforma
+## Arhitektonski princip
 
-- Microsoft Power Apps Canvas
-- Microsoft Power Automate
-- SharePoint Online
-- Microsoft 365 / Office 365 Users
-- Microsoft 365 Groups / Entra ID
-- App Config SharePoint lista
-- SharePoint liste za audit/logging
-- SharePoint biblioteke/folderi za dokumente
+DocCentralV3 koristi Power Apps kao korisnički interfejs, Power Automate kao servisni sloj i SharePoint Online kao data/document storage.
 
-## Osnovni obrazac
+Korisnik ne treba direktno da upisuje u SharePoint liste i biblioteke.
 
-Canvas aplikacija je frontend.
+## Komponente
 
-Power Automate je business/API layer.
+| Komponenta | Uloga |
+|---|---|
+| Canvas App `DocCentralV3` | Korisnički interfejs |
+| SharePoint liste | Poslovni podaci, konfiguracija, šifarnici, log |
+| SharePoint biblioteke | Dokumenti, prilozi, exporti, email dokumenti |
+| Power Automate | Svi write procesi i backend logika |
+| Service account | Izvršava write operacije |
+| Entra ID grupe | Kontrola pristupa |
+| App Config | Konfiguracija, šifarnici, procesi i delovodne knjige |
 
-SharePoint Online je data/document layer.
+## Power Apps pravila
 
-## Pristup podacima
+- Aplikacija mora biti responzivna.
+- Finalni broj ekrana određuje Claude Code na osnovu funkcionalnosti.
+- U aplikaciji nema dashboard-a.
+- U aplikaciji nema pregleda svih dokumenata.
+- Dokumenti se gledaju direktno u SharePoint listama/bibliotekama.
+- Aplikacija mora prikazati dokumente koje korisnik treba da odobri.
+- Aplikacija mora prikazati podsetnike.
+- Aplikacija mora imati unos novog dokumenta.
+- Aplikacija mora imati arhiviranje.
+- Aplikacija mora imati administraciju šifarnika.
+- Partneri su zasebna stavka menija.
 
-Read:
+## Power Automate pravila
 
-- Canvas app može čitati SharePoint liste gde korisnik ima pravo čitanja.
-- Canvas app može čitati Office 365 Users i Microsoft 365 Groups podatke.
-- Canvas app može čitati konfiguracije iz App Config.
+Power Automate flow-ovi su backend sloj.
 
-Write:
+Svi flow-ovi moraju koristiti postojeće connection references:
 
-- Create/Edit/Delete operacije moraju ići kroz Power Automate.
-- Flow radi pod servisnim nalogom.
-- Korisnici nemaju direktna Write prava nad SharePoint listama.
+- `CR_DocCentralV3_SharePoint`
+- `CR_DocCentralV3_Outlook`
+- `CR_DocCentralV3_Office365Users`
+- `CR_DocCentralV3_Office365Groups`
+- `CR_DocCentralV3_OneDrive`
+- `CR_DocCentralV3_Excel`
 
-## Permission model
+## SharePoint pravila
 
-- Service account: Read/Write
-- Owners: Read/Write
-- Members: Read
-- Viewers: Read
-- End users: Read Only nad relevantnim SharePoint lokacijama i item-ima
-- Item/folder/file permissions se dodeljuju kroz break inheritance
+- Korisnici imaju Read Only pristup.
+- Service account ima Read/Write.
+- Item/file permissions se fizički primenjuju na backend-u.
+- UI filtriranje nije dovoljno za security.
+- Prava se primenjuju i u Canvas aplikaciji i u SharePoint-u.
+- Dokumenti se čuvaju u root-u biblioteke, bez foldera.
 
-## White-label model
+## Dokumenti i prilozi
 
-Rešenje se prilagođava po klijentu kroz:
+Ne kreiraju se folderi za dokumente.
 
-- App Config
-- ProcesConfig
-- šifarnike
-- Entra group mapping
-- organizacione jedinice
-- tekstove i prevode
-- tipove dokumenata
-- statusne tokove
+Svi fajlovi se kreiraju u root-u biblioteke `EV_DocCentralV3_docDokumenti`.
 
-## Enterprise zahtevi
+Glavni dokument i prilozi razlikuju se po metapodacima.
 
-- concurrency-safe generisanje delovodnog broja
-- audit/logging kroz SharePoint liste
-- retry logic za kritične flow-ove
-- error handling u Power Apps i Power Automate
-- responzivan Canvas app
-- delegabilne formule
-- test matrica po scenarijima
+Prilog mora imati oznaku da je prilog i mora biti povezan sa glavnim dokumentom.
+
+## Anti-overwrite pravilo
+
+Svaki fajl mora imati unikatno sistemsko ime.
+
+Preporuka:
+
+```text
+{SafeDelovodniBroj}_{guid()}_{SafeOriginalFileName}
+```
+
+Prilog:
+
+```text
+{SafeDelovodniBroj}_PRILOG_{guid()}_{SafeOriginalFileName}
+```
+
+## Audit
+
+Audit se čuva u SharePoint listi preko `EV_DocCentralV3_lstAuditLog`.
+
+Flow `CF_DocCentralV3_LogEvent` je centralni flow za logovanje.

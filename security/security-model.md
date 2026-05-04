@@ -1,55 +1,55 @@
 # Security i permission model
 
-## Cilj
+## Osnovno pravilo
 
-Obezbediti da korisnici vide samo dokumente za koje imaju pravo pristupa i da ne mogu direktno menjati SharePoint podatke mimo kontrolisanih flow-ova.
+Korisnici imaju Read Only prava nad SharePoint-om.
 
-## Osnovna pravila
+Write operacije se izvršavaju kroz Power Automate pod service account-om.
 
-- Korisnici imaju SharePoint Read Only.
-- Sve Create/Edit/Delete operacije idu kroz Power Automate.
-- Power Automate radi pod servisnim nalogom.
-- Service account ima RW.
-- Owners imaju RW.
-- Members i Viewers imaju Read.
-- Ne postoji posebna admin grupa.
-- Prava zavise od organizacionih jedinica.
-- Entra group mapping je konfigurabilan po klijentu.
+## Service account
 
-## Backend security
+Service account ima Read/Write prava nad SharePoint listama i bibliotekama.
 
-Pristup se ne sme oslanjati samo na Power Apps UI filtriranje.
+## Korisnici
 
-Mora se primeniti backend security:
+Korisnici imaju Read pristup prema svojim pravima.
 
-- item-level permissions
-- folder/file permissions
-- break inheritance
-- dodela prava korisnicima/grupama
+## Owners / Members / Viewers
 
-## Canvas app security
+- Owners: Read/Write
+- Members: Read
+- Viewers: Read
+- Service account: Read/Write
 
-Canvas app dodatno može:
+## Admin grupa
 
-- sakriti kontrole
-- filtrirati prikaze
-- proveriti role
-- sprečiti pokretanje akcija za korisnika bez prava
+Ne postoji posebna admin grupa kao obavezno pravilo.
 
-Ali ovo je samo dodatni sloj, ne glavni security model.
-
-## SharePoint permissions
-
-Kod kreiranja dokumenta:
-
-1. prekida se nasleđivanje prava
-2. servisni nalog dobija RW
-3. owner dobija RW
-4. relevantni korisnici/grupe dobijaju Read
-5. dokument/folder/file postaje vidljiv samo relevantnim osobama
+Ako se uvede za konkretnog klijenta, mora biti konfiguraciona.
 
 ## Entra grupe
 
-Mapa Entra grupa zavisi od klijenta i mora biti u konfiguraciji.
+Mapa Entra grupa zavisi od klijenta.
 
-Ne hardkodovati tenant-specific grupe u aplikaciji ili flow-ovima.
+Ne sme biti hardcoded.
+
+Mora se čitati iz konfiguracije.
+
+## Organizacione jedinice
+
+Pristup dokumentima uvek je zasnovan na organizacionim jedinicama.
+
+## SharePoint permissions
+
+Prava se primenjuju fizički na:
+
+- iteme u listama
+- fajlove u bibliotekama
+
+Koristi se item-level break inheritance.
+
+## Canvas aplikacija
+
+Aplikacija takođe primenjuje vidljivost i filtriranje, ali to nije jedini sigurnosni sloj.
+
+Backend SharePoint prava moraju stvarno ograničiti pristup.

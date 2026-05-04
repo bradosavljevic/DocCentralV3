@@ -1,70 +1,66 @@
 # SharePoint lista: Svi predmeti
 
-## Svrha
+## Environment variable
 
-Centralna lista za registrovane dokumente/predmete.
+```text
+EV_DocCentralV3_lstSviPredmeti
+```
 
-Dokumenti se gledaju direktno u SharePoint listama, ne kroz aplikacijski dashboard.
+Logical name:
 
-## Ključna polja
+```text
+gpdoccen_EV_DocCentralV3_lstSviPredmeti
+```
 
-Napomena: tačna interna imena kolona treba uzeti iz XML/solution exporta. Često su interna imena jednaka display name-u bez razmaka.
+## Namena
 
-Očekivana ključna polja:
+Lista `Svi predmeti` je glavna evidencija zavedenih dokumenata.
 
-- ID
-- Title
-- DelovodniBroj
-- TipDokumenta
-- Stanje
-- DatumZavodjenja
-- Godina
-- Partner
-- PartnerNaziv
-- PartnerPIB
-- Inicijator
-- Odobrava
-- DodatniPrimaoci
-- OrganizacioneJedinice
-- LinkDoDokumenta
-- ArhivskiZnak
-- DatumArhiviranja
-- Created
-- Modified
-- Author
-- Editor
-
-## Statusi
-
-Osnovni statusi:
-
-- Zavedeno
-- U odobravanju
-- Odobreno
-- Odbijeno
-- Arhivirano
-
-Kroz ProcesConfig mogu postojati dodatni statusi.
-
-## Pravila
+## Ključna pravila
 
 - `DelovodniBroj` mora biti unikatan.
-- Dokument mora zadržati istoriju partnera čak i ako partner bude obrisan ili deaktiviran.
-- Korisnici vide samo dokumente za koje imaju SharePoint permissions.
-- Backend permissions su obavezni.
-- UI filtriranje nije dovoljno.
+- Status dokumenta se vodi kroz polje `Stanje`.
+- Dokumenti se ne pregledaju kroz Canvas aplikaciju kao opšta lista; gledaju se direktno u SharePoint-u.
+- Canvas aplikacija prikazuje samo funkcionalne poglede, npr. dokumente za odobrenje, arhiviranje i unos.
 
-## Permission model
+## Osnovni statusi
 
-Item/folder/file permissions se dodeljuju kroz break inheritance.
+```text
+Zavedeno
+U odobravanju
+Odobreno
+Odbijeno
+Arhivirano
+```
 
-- service account: RW
-- owners: RW
-- members/viewers: Read
-- relevantni korisnici/grupe: Read
+Kroz `ProcesConfig` klijent može definisati dodatne statuse.
 
-## Napomena za Claude Code
+## Preporučena dodatna snapshot polja za partnera
 
-Ne pretpostavljati da postoji ekran "Svi predmeti" u Canvas aplikaciji.
+Da bi istorija ostala očuvana i posle brisanja partnera:
 
-Svi predmeti je SharePoint lista, ne aplikacijski modul za pregled svih dokumenata.
+```text
+PartnerId
+PartnerNazivSnapshot
+PartnerPIBSnapshot
+PartnerMestoSnapshot
+PartnerAdresaSnapshot
+```
+
+## Arhiviranje
+
+Dokument može direktno iz `Zavedeno` u `Arhivirano`.
+
+To je jedini direktni put arhiviranja.
+
+## Odobravanje
+
+Odobravanje menja `Stanje`.
+
+Ako je odbijeno, status postaje `Odbijeno`.
+
+## Permissions
+
+Prava se fizički primenjuju na SharePoint item.
+
+UI filtriranje nije dovoljno.
