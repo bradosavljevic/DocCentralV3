@@ -1,264 +1,211 @@
-# DocCentral / e-Pisarnica — GitHub Documentation Repository
+# DocCentral V3 / e-Pisarnica
 
-## 1. Purpose
+## Status dokumentacije
 
-This repository contains documentation, requirements, architecture notes, templates, checklists and Claude Code skills for the DocCentral / e-Pisarnica solution.
+Ovaj repozitorijum sadrži poslovnu, tehničku i razvojnu dokumentaciju za novu verziju DocCentral / e-pisarnica rešenja.
 
-The goal is to provide a GitHub-ready knowledge base that can be used as the foundation for developing a new, improved enterprise version of the application.
+Cilj dokumentacije je da bude osnova za:
 
----
+- razvoj nove Power Apps Canvas aplikacije
+- razvoj Power Automate flow-ova
+- definisanje SharePoint data modela
+- pripremu Claude Code development brief-a
+- standardizaciju white-label implementacije po klijentu
+- buduću GitHub dokumentaciju projekta
 
-## 2. Project summary
+## Osnovni koncept rešenja
 
-DocCentral is an electronic registry and document archive solution based on Microsoft Power Platform and SharePoint Online.
+DocCentral je white-label e-pisarnica / elektronska evidencija dokumenata koja se prilagođava po klijentu.
 
-Core platform:
+Rešenje koristi:
 
-- Power Apps Canvas application
-- Power Automate flows
-- SharePoint Online lists and document libraries
-- Microsoft 365 / Entra ID groups
-- App Config list for dictionaries and configuration
+- Power Apps Canvas aplikaciju kao korisnički interfejs
+- Power Automate kao servisni sloj za upise, prava i poslovnu logiku
+- SharePoint Online liste i biblioteke kao data/storage sloj
+- Microsoft 365 / Entra ID grupe za kontrolu pristupa
+- App Config listu kao centralni izvor šifarnika i konfiguracija
 
-Main business capabilities:
+## Ključni arhitektonski princip
 
-- document entry
-- document metadata management
-- document registration
-- unique registry number / `DelovodniBroj`
-- document archiving
-- partner data usage
-- organizational-unit based access
-- SharePoint item/file permission control
+Korisnici imaju Read Only prava nad SharePoint sadržajem.
 
----
+Svi upisi, izmene, dodela prava, generisanje delovodnog broja i sistemske operacije moraju ići kroz Power Automate flow-ove koji rade pod servisnim nalogom.
 
-## 3. Critical project principles
+Aplikacija ne sme da se oslanja samo na UI filtriranje. Backend prava na SharePoint item/folder/file nivou moraju stvarno ograničavati pristup.
 
-These rules are mandatory for the new version:
+## Važni poslovni procesi
 
-1. Users have Read Only permissions in SharePoint.
-2. Create/Edit/Delete operations go through Power Automate.
-3. Power Automate writes under service account.
-4. `DelovodniBroj` must be unique and concurrency-safe.
-5. Canvas app must be responsive.
-6. Serbian is the default language.
-7. English must be supported.
-8. App Config should be used for dictionaries and configuration.
-9. SharePoint backend permissions must enforce access.
-10. UI filtering in Canvas app is not enough for security.
-11. Critical operations must be logged.
-12. Failed registry number attempts must be logged.
+### Unos novog dokumenta
 
----
+Korisnik otvara aplikaciju, bira tip dokumenta, popunjava obavezna polja, dodaje prilog, bira da li koristi rezervisani delovodni broj ili sledeći broj u nizu, zatim klikće `Zavedi`.
 
-## 4. Repository structure
+Ako se koristi rezervisani broj, korisnik bira datum zavođenja.
+
+Ako se koristi sledeći broj u nizu, datum zavođenja se automatski postavlja na današnji datum.
+
+Sistem validira unos, preuzima ili generiše delovodni broj, kreira SharePoint item, kreira folder/biblioteku za dokument, dodeljuje prava i prikazuje poruku korisniku.
+
+### Arhiviranje
+
+Arhiviranje je posebna funkcionalnost / ekran.
+
+Korisnik može da izlista sve dokumente u statusu `Zavedeno` za tekuću godinu i da ih arhivira sa odgovarajućim arhivskim znacima.
+
+Direktan prelaz iz `Zavedeno` u `Arhivirano` je dozvoljen i to je jedini direktni put arhiviranja.
+
+### Zaključenje godine
+
+Na kraju godine moguće je zaključiti godinu samo ako su ispunjeni svi uslovi:
+
+- svi dokumenti iz tekuće godine su u statusu `Arhivirano`
+- ne postoji nijedan dokument u drugom statusu
+- lista rezervisanih brojeva je prazna
+- kreira se nova delovodna knjiga za sledeću godinu
+- aktivna godina se menja u App Config
+
+Zaključana godina se nikada ne može ponovo otključati.
+
+## Statusi dokumenata
+
+Osnovni statusi su:
+
+- Zavedeno
+- U odobravanju
+- Odobreno
+- Odbijeno
+- Arhivirano
+
+Kroz `ProcesConfig` klijent može definisati i dodatne / prilagođene statuse.
+
+## Approval proces
+
+Dokument ide na odobrenje jednom korisniku u jednom koraku.
+
+Ako ima više korisnika, odobravanje je sekvencijalno.
+
+Postoji mogućnost slanja koraka na grupu. Tada više korisnika dobija obaveštenje, ali prvi korisnik koji odobri završava taj status / korak.
+
+Odobrenje menja status dokumenta kroz polje `Stanje`.
+
+Ako je dokument odbijen, dobija status `Odbijeno`, vraća se inicijatoru i inicijator može ponovo pokrenuti approval nakon izmene dokumenta ili metadata polja.
+
+## Ekrani aplikacije
+
+U aplikaciji ne postoji Dashboard.
+
+U aplikaciji ne postoji ekran `Svi predmeti` za pregled svih dokumenata.
+
+Dokumenti se pregledaju direktno u SharePoint listama.
+
+`Novi predmet` je forma za unos novog dokumenta.
+
+Aplikacija treba da sadrži funkcionalnosti za:
+
+- unos novog dokumenta
+- arhiviranje
+- zaključenje godine
+- podsetnike
+- dokumente koje korisnik treba da odobri
+- administraciju šifarnika
+- partnere kao posebnu stavku menija
+
+Finalni broj ekrana, nazive ekrana i kontrole treba da odredi Claude Code na osnovu funkcionalnih zahteva i standarda iz ovog repozitorijuma.
+
+## Partneri
+
+Partneri nisu deo Administracije, već posebna stavka u meniju.
+
+Korisnik koji zavodi dokumente može da:
+
+- kreira partnera
+- menja partnera
+- briše partnera
+- pregleda partnera
+
+Brisanje partnera ne sme uticati na istorijske dokumente u `Svi predmeti`.
+
+Obrisani partner ne sme biti dostupan za izbor u novim dokumentima.
+
+## Rezervisani delovodni brojevi
+
+Korisnik koji zavodi dokumente može da kreira i koristi rezervisane brojeve.
+
+Rezervisani broj:
+
+- važi samo za jednu godinu
+- može se koristiti za bilo koji tip dokumenta
+- vide ga svi korisnici koji imaju pravo zavođenja
+- može se izmeniti nakon kreiranja
+- ne može se ručno obrisati nakon rezervacije
+- briše se automatski kada se iskoristi
+
+## Podsetnici
+
+Korisnik može kreirati podsetnik za sebe ili za jednog / više drugih korisnika.
+
+Podsetnik se šalje emailom jednom, na datum podsetnika, u 08:00 ujutro ili prema sistemskoj konfiguraciji.
+
+Korisnik ne definiše individualno vreme podsetnika.
+
+Korisnik može menjati i brisati podsetnike.
+
+Ne postoji status podsetnika kao `Aktivan`, `Poslat` ili `Otkazan`, osim ako se naknadno uvede kao tehničko poboljšanje.
+
+## Logging i audit
+
+Potrebna je sistemska log lista.
+
+Obavezno logovati:
+
+- neuspešno kreiranje dokumenta
+- neuspešan pokušaj generisanja delovodnog broja
+- uspešno generisan delovodni broj
+- neuspešno generisanje broja
+- korišćenje rezervisanog broja
+- arhiviranje
+- zaključenje godine
+- grešku Power Automate flow-a
+
+## Code quality standard
+
+Nova aplikacija mora poštovati sledeće standarde:
+
+- responsive design
+- čist App Checker
+- formula-level error management
+- `IfError` oko Patch / Flow poziva
+- `gbl`, `loc`, `col` naming konvencije
+- delegabilne formule
+- bez live search query-ja na svaki karakter
+- bez cross-screen referenciranja kontrola
+- bez nested galleries osim ako je opravdano
+
+## Struktura repozitorijuma
 
 ```text
 .
 ├── README.md
-├── requirements/
-│   ├── functional-requirements.md
-│   └── non-functional-requirements.md
 ├── architecture/
-│   ├── target-architecture.md
-│   └── concurrency-design.md
-├── power-platform/
-│   ├── power-apps-rules.md
-│   └── power-automate-rules.md
-├── security/
-│   └── security-model.md
-├── testing/
-│   ├── test-plan.md
-│   └── acceptance-criteria.md
-├── migration/
-│   └── migration-plan.md
-├── operations/
-│   ├── deployment-guide.md
-│   └── runbook.md
-├── templates/
-│   ├── flow-response-template.md
-│   ├── error-log-template.md
-│   └── sharepoint-list-definition-template.md
+├── business/
 ├── checklists/
-│   ├── pre-development-checklist.md
-│   └── code-review-checklist.md
 ├── claude-code/
-│   └── README.md
+├── data-model/
+├── processes/
+├── security/
 ├── skills/
-│   ├── doccentral-architecture-skill.md
-│   ├── power-apps-skill.md
-│   ├── power-automate-skill.md
-│   ├── concurrency-skill.md
-│   └── security-skill.md
-└── data-model/
-    └── existing SharePoint list documentation files
+└── templates/
 ```
 
----
+## Sporno / nepoznato
 
-## 5. Known data model areas
+Sledeće stavke ostaju otvorene ili se čitaju iz solution exporta:
 
-Known or expected SharePoint assets:
-
-- `Svi predmeti`
-- `Partneri`
-- `App Config`
-- `Rezervisani Brojevi`
-- document libraries
-- email/shared document related libraries or lists where applicable
-
-Important clarification:
-
-- XML list exports are used for understanding SharePoint schemas.
-- JSON in App Config contains dictionaries and configuration read by the application.
-- Internal column names are often the same as display names without spaces, but must be verified from exports.
-- Required fields are not fully defined yet.
-
----
-
-## 6. DelovodniBroj / registry number
-
-This is the most critical enterprise requirement.
-
-Known facts:
-
-- App Config contains `Delovodne knjige`.
-- Next registry number is stored and incremented there.
-- `Rezervisani Brojevi` list exists.
-- `DelovodniBroj` is unique.
-- ETag is not currently used.
-- Retry logic should be implemented.
-- Audit of failed attempts should be implemented.
-- Every year the registry book is locked.
-- Archive book is created for registered documents in archived status.
-
-Target rule:
-
-- Number generation/reservation must be handled by backend logic.
-- Two users must never receive the same `DelovodniBroj`.
-
-Detailed design:
-
-- `architecture/concurrency-design.md`
-
----
-
-## 7. Security model
-
-Known rules:
-
-- Standard users have Read Only permissions in SharePoint.
-- Power Automate writes under service account.
-- Document access depends on organizational units.
-- Entra group mapping depends on each client.
-- Item/folder/file permissions use break inheritance.
-- Service account has read/write rights.
-- Owners have read/write rights.
-- Members/Viewers have Read rights.
-- There is no separate admin group currently.
-- Access is enforced both in Canvas app and SharePoint.
-- Backend permissions hide files/items, not only UI filtering.
-
-Detailed model:
-
-- `security/security-model.md`
-
----
-
-## 8. Power Apps direction
-
-Claude Code may decide:
-
-- exact screen count
-- screen names
-- controls
-- responsive layout
-- UI components
-
-But it must respect:
-
-- no direct SharePoint writes for Create/Edit/Delete
-- App Config usage
-- Serbian/English support
-- responsive layout
-- standardized flow response handling
-- delegable or server-side filtering
-- security rules
-
-Detailed rules:
-
-- `power-platform/power-apps-rules.md`
-
----
-
-## 9. Power Automate direction
-
-Power Automate is the backend layer.
-
-It should handle:
-
-- create/update/delete operations
-- registration
-- registry number reservation
-- archiving
-- permission assignment
-- audit/error logging
-
-Detailed rules:
-
-- `power-platform/power-automate-rules.md`
-
----
-
-## 10. Out of scope for now
-
-The following areas are intentionally not fully specified yet:
-
-- SAP import implementation details
-- external import format
-- client-specific Entra group map
-- final approval process details
-- PDF generation details
-- final production deployment values
-
-These should be added later when confirmed.
-
----
-
-## 11. How Claude Code should use this repository
-
-Claude Code should:
-
-1. Read this README.
-2. Read requirements.
-3. Read architecture and concurrency design.
-4. Read Power Apps and Power Automate rules.
-5. Read security model.
-6. Read testing and acceptance criteria.
-7. Use skills from `skills/` folder as project-specific behavior instructions.
-8. Mark unknowns as `NEPOZNATO` / `UNKNOWN`.
-9. Avoid inventing undocumented facts.
-10. Generate implementation that satisfies acceptance criteria.
-
----
-
-## 12. Current readiness level
-
-This repository is ready for:
-
-- documentation consolidation
-- architecture planning
-- Claude Code briefing
-- initial development planning
-- test planning
-
-Before full build, verify:
-
-- latest Power Platform solution export
-- complete flow inventory
-- complete Canvas app formulas
-- complete SharePoint schemas
-- App Config active keys
-- client-specific group mapping
-- deployment environment details
+- formule iz Canvas aplikacije
+- kompletan inventar flow-ova
+- connection references
+- environment variables
+- detaljna App Config upotreba po ekranima
+- konačan deployment model po tenantima
+- konačna mapa Entra grupa po klijentu
+- detaljan PDF generation mehanizam
+- migration strategija za postojeće produkcione podatke
