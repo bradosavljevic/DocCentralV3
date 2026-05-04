@@ -1,90 +1,23 @@
-# GitHub komande za upload
+# GitHub komande za upload ažurirane dokumentacije
 
-Pretpostavka: nalaziš se u root folderu lokalnog GitHub repo-a, npr. `DocCentralV3`.
-
-## 1. Raspakuj ZIP
-
-Raspakuj sadržaj ZIP fajla direktno u root repo folder.
-
-## 2. Proveri status
+Pretpostavka: ZIP je raspakovan u root folder lokalnog repository-ja `DocCentralV3`.
 
 ```bash
 git status
+
+git add README.md   configuration/power-platform-object-names.md   configuration/environment-variables.md   deployment/deployment-model.md   power-automate/flow-inventory.md   power-automate/register-document-flow.md   prompts/master-claude-code-prompt.md   templates/claude-code-development-brief.md   claude-code/README.md   skills/*.md
+
+git status
+
+git commit -m "Update DocCentral V3 documentation with created solution object names"
+
+git push
 ```
 
-## 3. Dodaj sve fajlove
-
-```bash
-git add README.md \
-  claude-code/ \
-  templates/ \
-  checklists/ \
-  skills/ \
-  data-model/ \
-  business/ \
-  architecture/ \
-  power-apps/ \
-  power-automate/ \
-  security/ \
-  testing/ \
-  deployment/ \
-  operations/ \
-  prompts/ \
-  github-commands.md
-```
-
-Ako želiš jednostavnije:
+Ako želiš da dodaš sve fajlove iz paketa odjednom:
 
 ```bash
 git add .
-```
-
-## 4. Commit
-
-```bash
-git commit -m "Update DocCentral V3 documentation and Claude Code skills"
-```
-
-## 5. Push
-
-```bash
-git push origin main
-```
-
-Ako ti je branch `master`:
-
-```bash
-git push origin master
-```
-
-## 6. Ako git prijavi obrisane fajlove
-
-Prvo proveri:
-
-```bash
-git status
-```
-
-Ako su fajlovi namerno zamenjeni novima, koristi:
-
-```bash
-git add -A
-git commit -m "Refresh DocCentral V3 documentation package"
-git push origin main
-```
-
-Ako brisanje nije namerno, vrati fajlove iz git-a:
-
-```bash
-git restore <putanja-do-fajla>
-```
-
-## PACode folder
-
-Ako dodaješ samo novu PACode strukturu:
-
-```bash
-git add PACode/ README.md claude-code/README.md prompts/master-claude-code-prompt.md templates/claude-code-development-brief.md github-commands.md
-git commit -m "Add PACode output folder rule"
-git push origin main
+git commit -m "Update DocCentral V3 documentation with created object names"
+git push
 ```

@@ -22,3 +22,8 @@ Koristi ovaj skill kada projektuješ ili menjaš arhitekturu DocCentral V3 reše
 - osloniti security samo na UI filtering
 - direktno dozvoliti korisnički Write u SharePoint
 - generisati delovodni broj u Canvas app bez server-side zaštite
+
+
+## Naming / postojeći objekti
+
+Koristi solution `DocCentralV3`, connection references `CR_DocCentralV3_*`, environment variables `EV_DocCentralV3_*` i cloud flow nazive sa prefixom `CF_DocCentralV3_`. Ne koristiti prefix `PA_` za nove flow-ove. Svi zasebni code fajlovi moraju biti u folderu `PACode`.

@@ -46,3 +46,8 @@ Primeri fajlova koji moraju ići u `PACode`:
 - `.md` fajlovi koji sadrže isključivo code/specifikaciju za izvršenje
 - Power Automate definition/pseudocode fajlovi
 - Power Apps formula fajlovi
+
+
+## Obavezna postojeća Power Platform imena
+
+Pre implementacije pročitaj `configuration/power-platform-object-names.md` i `configuration/environment-variables.md`. Koristi postojeće nazive solution objekata, connection references, environment variables i planirane `CF_` cloud flow nazive. Ne koristiti stari `PA_` prefix za flow-ove.

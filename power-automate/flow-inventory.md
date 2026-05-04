@@ -1,106 +1,165 @@
-# Power Automate flow inventory - plan
+# Power Automate flow inventory - DocCentral V3
 
-## Cilj
+## Status
 
-Definisati flow-ove potrebne za novu verziju DocCentral V3.
+Flow-ovi će biti kreirani kasnije. Dokumentacija mora koristiti sledeće nazive jer su oni zaključani kao naming standard za solution `DocCentralV3`.
 
-## Predloženi flow-ovi
+Svi flow-ovi koriste prefix `CF_`.
 
-### 1. RegisterDocument
+## Connection references koje flow-ovi koriste
+
+- `CR_DocCentralV3_SharePoint`
+- `CR_DocCentralV3_Outlook`
+- `CR_DocCentralV3_Office365Users`
+- `CR_DocCentralV3_Office365Groups`
+- `CR_DocCentralV3_OneDrive`
+- `CR_DocCentralV3_Excel`
+
+## Environment variables koje flow-ovi koriste
+
+- `EV_DocCentralV3_SharePointSite`
+- `EV_DocCentralV3_lstSviPredmeti`
+- `EV_DocCentralV3_lstPartneri`
+- `EV_DocCentralV3_lstAppConfig`
+- `EV_DocCentralV3_lstRezervisaniBrojevi`
+- `EV_DocCentralV3_lstPodsetnici`
+- `EV_DocCentralV3_lstAuditLog`
+- `EV_DocCentralV3_docDokumenti`
+- `EV_DocCentralV3_docEmailDocs`
+- `EV_DocCentralV3_docExports`
+
+## Obavezni cloud flow-ovi
+
+### 1. `CF_DocCentralV3_CreateDocument`
 
 Svrha:
 
+- centralni flow za zavođenje dokumenta
 - validacija zahteva
-- generisanje ili korišćenje rezervisanog delovodnog broja
-- kreiranje dokument item-a
-- kreiranje foldera/biblioteke
-- dodela prava
-- audit log
-- odgovor Power Apps aplikaciji
+- poziv generisanja ili korišćenja rezervisanog delovodnog broja
+- kreiranje item-a u `EV_DocCentralV3_lstSviPredmeti`
+- kreiranje foldera/biblioteke kroz `CF_DocCentralV3_CreateDocumentFolder`
+- dodela prava kroz `CF_DocCentralV3_AssignPermissions`
+- audit kroz `CF_DocCentralV3_LogEvent`
+- kontrolisan response nazad u Power Apps
 
-### 2. GenerateOrReserveRegistryNumber
+### 2. `CF_DocCentralV3_GenerateRegistryNumber`
 
 Svrha:
 
-- centralizovano concurrency-safe generisanje broja
-- ETag / optimistic locking
+- concurrency-safe generisanje sledećeg delovodnog broja
+- čitanje i ažuriranje delovodne knjige iz `EV_DocCentralV3_lstAppConfig`
+- optimistic locking / ETag ako se implementira
 - retry logika
-- logovanje pokušaja
+- logovanje uspešnih i neuspešnih pokušaja
 
-### 3. UseReservedNumber
+### 3. `CF_DocCentralV3_UseReservedNumber`
 
 Svrha:
 
-- validacija rezervisanog broja
+- validacija rezervisanog broja iz `EV_DocCentralV3_lstRezervisaniBrojevi`
+- provera aktivne godine
 - korišćenje rezervisanog broja
-- brisanje nakon uspešnog zavođenja
+- brisanje rezervisanog broja tek nakon uspešnog zavođenja dokumenta
+- logovanje korišćenja rezervisanog broja
 
-### 4. StartApprovalProcess
-
-Svrha:
-
-- pokretanje approval toka
-- slanje korisniku ili grupi
-- status `U odobravanju`
-
-### 5. ProcessApprovalResponse
+### 4. `CF_DocCentralV3_CreateDocumentFolder`
 
 Svrha:
 
-- upis rezultata odobravanja
+- kreiranje foldera/lokacije za dokument u `EV_DocCentralV3_docDokumenti`
+- eventualno kreiranje strukture za email dokumente u `EV_DocCentralV3_docEmailDocs`
+- vraćanje URL-a/lokacije dokumenta
+
+### 5. `CF_DocCentralV3_AssignPermissions`
+
+Svrha:
+
+- break inheritance na item/folder/file nivou
+- dodela RW prava servisnom nalogu/owner-u
+- dodela Read prava članovima/viewer-ima
+- dodela prava na osnovu organizacione jedinice i konfigurisanih grupa
+- logovanje grešaka kod prava
+
+### 6. `CF_DocCentralV3_SendForApproval`
+
+Svrha:
+
+- pokretanje approval procesa
+- slanje jednom korisniku ili grupi
+- promena `Stanje` u `U odobravanju`
+- sekvencijalna obrada ako ima više koraka
+- audit događaj
+
+### 7. `CF_DocCentralV3_ProcessApprovalResponse`
+
+Svrha:
+
+- obrada odgovora odobravača
 - promena polja `Stanje`
-- obrada odbijanja
-- vraćanje inicijatoru
+- ako je odbijeno: status `Odbijeno`, vraćanje inicijatoru
+- ako je odobreno: nastavak procesa ili finalni status prema ProcesConfig
+- logovanje rezultata
 
-### 6. SendDailyReminders
+### 8. `CF_DocCentralV3_SendReminders`
 
 Svrha:
 
 - scheduled flow u 08:00
-- pronalazak današnjih podsetnika
-- slanje email-a
-- sprečavanje duplog slanja
+- čitanje `EV_DocCentralV3_lstPodsetnici`
+- slanje email podsetnika preko `CR_DocCentralV3_Outlook`
+- sprečavanje duplog slanja istog podsetnika
 - logovanje grešaka
 
-### 7. ArchiveDocuments
+### 9. `CF_DocCentralV3_ArchiveDocument`
 
 Svrha:
 
-- arhiviranje dokumenata iz statusa `Zavedeno`
-- dodela arhivskih znakova
+- arhiviranje dokumenta iz statusa `Zavedeno`
+- upis arhivskih znakova
 - promena statusa u `Arhivirano`
-- logovanje
+- logovanje arhiviranja
 
-### 8. CloseRegistryYear
-
-Svrha:
-
-- proverava da su svi dokumenti arhivirani
-- proverava da nema rezervisanih brojeva
-- zaključava godinu
-- kreira novu delovodnu knjigu
-- menja aktivnu godinu u App Config
-- loguje rezultat
-
-### 9. ExportConfigurationToExcel
+### 10. `CF_DocCentralV3_CloseRegistryYear`
 
 Svrha:
 
-- export jednog šifarnika
-- export svih šifarnika
+- provera da su svi dokumenti iz aktivne godine `Arhivirano`
+- provera da je lista rezervisanih brojeva prazna
+- zaključavanje godine
+- kreiranje nove delovodne knjige za sledeću godinu u `EV_DocCentralV3_lstAppConfig`
+- promena aktivne godine u App Config
+- logovanje zaključavanja godine
 
-### 10. GenerateArchiveBookPdf
+### 11. `CF_DocCentralV3_ExportAppConfig`
 
 Svrha:
 
-- generisanje PDF Arhivske knjige
-- čuvanje PDF-a u odgovarajuću biblioteku/folder
-- logovanje
+- export jednog šifarnika u Excel
+- export svih šifarnika odjednom
+- čuvanje export fajlova u `EV_DocCentralV3_docExports`
+
+### 12. `CF_DocCentralV3_GenerateArchiveBookPdf`
+
+Svrha:
+
+- generisanje PDF Arhivske knjige u prvoj verziji
+- čuvanje PDF-a u `EV_DocCentralV3_docExports` ili dogovorenu biblioteku
+- logovanje generisanja
+
+### 13. `CF_DocCentralV3_LogEvent`
+
+Svrha:
+
+- centralni child flow/helper flow za upis u `EV_DocCentralV3_lstAuditLog`
+- prima CorrelationId, EventType, EventStatus, Severity, FlowName, PayloadJson, ErrorMessage i tehničke detalje
+- koristi ga svaki kritičan flow
 
 ## Obavezni standardi
 
-- svaki kritičan flow mora imati error handling
-- svaki kritičan flow mora pisati log
-- koristiti correlation id
-- vraćati kontrolisan response u Power Apps
-- Create/Edit/Delete u SharePoint raditi pod servisnim nalogom
+- Svaki kritičan flow mora imati error handling.
+- Svaki kritičan flow mora pisati u `EV_DocCentralV3_lstAuditLog` preko `CF_DocCentralV3_LogEvent`.
+- Koristiti CorrelationId kroz ceo proces.
+- Vraćati kontrolisan response u Power Apps.
+- Create/Edit/Delete u SharePoint raditi pod servisnim nalogom.
+- Ne koristiti stara imena sa prefixom `PA_`.

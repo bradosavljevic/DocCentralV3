@@ -21,3 +21,8 @@
 ## Pravilo
 
 Svaka poslovna funkcija mora imati happy path, validation path, permission path i error path.
+
+
+## Naming / postojeći objekti
+
+Koristi solution `DocCentralV3`, connection references `CR_DocCentralV3_*`, environment variables `EV_DocCentralV3_*` i cloud flow nazive sa prefixom `CF_DocCentralV3_`. Ne koristiti prefix `PA_` za nove flow-ove. Svi zasebni code fajlovi moraju biti u folderu `PACode`.

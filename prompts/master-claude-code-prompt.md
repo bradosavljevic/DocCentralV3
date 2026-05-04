@@ -44,3 +44,8 @@ Dokumentacione fajlove smeštaj u postojeće dokumentacione foldere.
 Code fajlovi ne smeju biti razbacani kroz root projekta.
 
 Dozvoljeno je da dokumentacija sadrži kratke code block primere, ali svi zasebni fajlovi sa kodom moraju biti u `PACode`.
+
+
+## Obavezna postojeća Power Platform imena
+
+Pre implementacije pročitaj `configuration/power-platform-object-names.md` i `configuration/environment-variables.md`. Koristi postojeće nazive solution objekata, connection references, environment variables i planirane `CF_` cloud flow nazive. Ne koristiti stari `PA_` prefix za flow-ove.

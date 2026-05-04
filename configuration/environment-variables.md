@@ -1,27 +1,32 @@
-# Configuration — Environment Variables
+# Environment variables - DocCentral V3
 
-## Status
+## Svrha
 
-```text
-DOPUNJENO NA OSNOVU POWER PLATFORM SOLUTION-A
-```
+Ovaj dokument definiše environment variables koje su već kreirane u solution-u `DocCentralV3` i koje Claude Code mora koristiti u svim Power Apps i Power Automate predlozima.
 
-## Činjenice
+## Pravila
 
-Solution sadrži 9 environment variables.
+- Ne hardkodovati SharePoint URL, list GUID, library GUID ili nazive lista u formulama/flow-ovima ako postoji environment variable.
+- Koristiti postojeće display name i logical/name vrednosti.
+- Pre svakog testiranja proveriti da svaka environment variable ima popunjenu `Current value` vrednost.
+- `EV_DocCentralV3_SharePointSite` je osnovna promenljiva za SharePoint site.
+- Liste i biblioteke se referenciraju kroz svoje environment variables.
 
-- `pbmlv2_EV_DocCentral21_SharePointSite`
-- `pbmlv2_EV_DocCentral21_lstPodestinici`
-- `pbmlv2_EV_DocCentral21_lstDocuments`
-- `pbmlv2_EV_DocCentral21_lstRezervisanibrojevi`
-- `pbmlv2_EV_DocCentral21_lstSviPredmeti`
-- `pbmlv2_EV_DocCentral21_Export`
-- `gpdoccen_EV_DocCentral21_EmailDocuments`
-- `gpdoccen_EV_DocCentral21_lstPartneri`
-- `pbmlv2_EV_DocCentral21_lstAppConfig`
+## Lista environment variables
 
-## Preporuke
+| Display name | Logical/name | Namena |
+|---|---|---|
+| `EV_DocCentralV3_SharePointSite` | `gpdoccen_EV_DocCentralV3_SharePointSite` | SharePoint site |
+| `EV_DocCentralV3_lstSviPredmeti` | `gpdoccen_EV_DocCentralV3_lstSviPredmeti` | Glavna lista predmeta/dokumenata |
+| `EV_DocCentralV3_lstPartneri` | `gpdoccen_EV_DocCentralV3_lstPartneri` | Lista partnera |
+| `EV_DocCentralV3_lstAppConfig` | `gpdoccen_EV_DocCentralV3_lstAppConfig` | App Config / šifarnici / procesna konfiguracija |
+| `EV_DocCentralV3_lstRezervisaniBrojevi` | `gpdoccen_EV_DocCentralV3_lstRezervisaniBrojevi` | Rezervisani delovodni brojevi |
+| `EV_DocCentralV3_lstPodsetnici` | `gpdoccen_EV_DocCentralV3_lstPodsetnici` | Podsetnici |
+| `EV_DocCentralV3_lstAuditLog` | `gpdoccen_EV_DocCentralV3_lstAuditLog` | Audit/log lista |
+| `EV_DocCentralV3_docDokumenti` | `gpdoccen_EV_DocCentralV3_docDokumenti` | Dokument biblioteka za priloge/dokumente |
+| `EV_DocCentralV3_docEmailDocs` | `gpdoccen_EV_DocCentralV3_docEmailDocs` | Biblioteka za email dokumente |
+| `EV_DocCentralV3_docExports` | `gpdoccen_EV_DocCentralV3_docExports` | Biblioteka za export fajlove |
 
-- Definisati vrednosti po Dev/Test/Prod okruženju.
-- Ne hardkodovati URL-ove, GUID-eve lista i biblioteka.
-- Koristiti deployment settings za import solution-a.
+## Napomena
+
+Flow-ovi se kreiraju kasnije, ali njihovi nazivi su već definisani u `power-automate/flow-inventory.md`.

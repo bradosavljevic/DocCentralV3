@@ -1,4 +1,4 @@
-# Flow: RegisterDocument
+# Flow: `CF_DocCentralV3_CreateDocument`
 
 ## Tip
 
@@ -6,7 +6,7 @@ Power Apps triggered flow.
 
 ## Svrha
 
-Centralni flow za zavođenje novog dokumenta.
+Centralni flow za zavođenje novog dokumenta. Ovaj flow koristi postojeći naziv `CF_DocCentralV3_CreateDocument`.
 
 ## Input
 
@@ -38,11 +38,11 @@ Očekivani input:
 6. Ako se koristi sledeći broj:
    - generiši broj kroz concurrency-safe mehanizam
    - uvećaj brojač
-7. Kreiraj SharePoint item u Svi predmeti.
-8. Kreiraj folder/biblioteku za dokument.
-9. Dodeli prava.
+7. Kreiraj SharePoint item u listi iz `EV_DocCentralV3_lstSviPredmeti`.
+8. Pozovi `CF_DocCentralV3_CreateDocumentFolder` i kreiraj folder/biblioteku za dokument.
+9. Pozovi `CF_DocCentralV3_AssignPermissions` i dodeli prava.
 10. Ako je korišćen rezervisani broj, obriši ga iz liste.
-11. Loguj uspeh.
+11. Loguj uspeh kroz `CF_DocCentralV3_LogEvent` u `EV_DocCentralV3_lstAuditLog`.
 12. Vrati response aplikaciji.
 
 ## Error handling
