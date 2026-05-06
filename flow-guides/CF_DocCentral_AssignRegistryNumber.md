@@ -1,28 +1,46 @@
 # Flow Guide: CF_DocCentral_AssignRegistryNumber
 
-Last updated: 2026-05-06
+Last updated: 2026-05-06 (revised)
 
 ---
 
 ## Purpose
 
-Assigns the next sequential `DelovodniBroj` (registry number) to a document that has already been created as a `Svi predmeti` item and a `Dokumenta` file. Uses `NumberLocks` to prevent concurrent assignment. Enforces no-duplicate and no-skip rules. Blocks if any `FailedNeedsRecovery` item exists. Supports a reserved number path.
+Assigns the next sequential registry number to a document that has already been created as a `Svi predmeti` item and a `Dokumenta` file. Uses `NumberLocks` to prevent concurrent assignment. Enforces strict no-duplicate and no-skip rules. Blocks if any `FailedNeedsRecovery` or `MetadataSyncFailed` item exists. Supports a reserved number path.
 
-This flow is called by `CF_DocCentral_CreateDocumentTransaction` as an internal step. It is not called directly from Canvas app.
+This flow is a **child flow** called by `CF_DocCentral_CreateDocumentTransaction`. It is not called directly from Canvas app.
+
+---
+
+## Design principles in this revision
+
+The following rules govern every design decision in this flow:
+
+1. **Counter is authoritative.** The next number is always `CurrentCounter + 1`. The `Svi predmeti` max query is used only for out-of-sync detection, not to silently advance the counter. If the counter and `Svi predmeti` disagree, the flow returns `COUNTER_OUT_OF_SYNC` and stops.
+
+2. **No skipping.** If the next candidate number is in `Rezervisani brojevi` and `useReservedNumber = false`, the flow returns `NEXT_NUMBER_IS_RESERVED`. It does not silently skip to the next available number.
+
+3. **MetadataSyncFailed blocks new registrations.** `MetadataSyncFailed` is treated the same as `FailedNeedsRecovery` in the blocking check. Both states indicate unresolved data inconsistency.
+
+4. **No `Terminate(Cancelled)` for expected business outcomes.** All control flow paths use output variables. `Terminate` is never used to represent a business outcome in a child flow; it produces unpredictable caller behavior. The flow always ends at the Respond action with a populated output.
+
+5. **Lock state reflects outcome precisely.** On success: lock is updated to `Released`. On recovery-required failure: lock is updated to `Failed` and kept for the recovery audit. On pre-lock business rejection (e.g., blocked, counter out of sync): the lock is released because no data was written and there is nothing to recover.
+
+6. **DelovodniBroj is stored in three separate columns** to enable filtering, sorting, and reporting without string parsing.
 
 ---
 
 ## Trigger
 
-**Type:** Child flow (called from `CF_DocCentral_CreateDocumentTransaction` using the Run a Child Flow action)
+**Type:** Child flow (called from `CF_DocCentral_CreateDocumentTransaction` via the **Run a Child Flow** action)
 
-If a standalone trigger is needed for testing, use **Power Apps V2**.
+For standalone testing: **Manually trigger a flow** (not Power Apps V2, to avoid exposing the flow as a Canvas action).
 
 ---
 
 ## Connections
 
-All SharePoint actions in this flow must use the service account connection reference `CR_DocCentralV3_SharePoint`. No user-delegated connection.
+All SharePoint actions must use `CR_DocCentralV3_SharePoint` (service account connection reference). No user-delegated connection.
 
 ---
 
@@ -30,12 +48,40 @@ All SharePoint actions in this flow must use the service account connection refe
 
 | Variable | Purpose |
 |---|---|
-| `EV_DocCentralV3_lstSviPredmeti` | URL of `Svi predmeti` SharePoint list |
-| `EV_DocCentralV3_lstAppConfig` | URL of `AppConfig` SharePoint list |
-| `EV_DocCentralV3_docDokumenti` | URL of `Dokumenta` SharePoint library |
+| `EV_DocCentralV3_lstSviPredmeti` | Site-relative URL of `Svi predmeti` list |
+| `EV_DocCentralV3_lstAppConfig` | Site-relative URL of `AppConfig` list |
+| `EV_DocCentralV3_docDokumenti` | Site-relative URL of `Dokumenta` library |
+| `EV_DocCentralV3_lstNumberLocks` | Site-relative URL of `NumberLocks` list — **must be created by developer** |
+| `EV_DocCentralV3_lstRezervBrojevi` | Site-relative URL of `Rezervisani brojevi` list |
 | `EV_DocCentralV3_SharePointSite` | Root SharePoint site URL |
 
-The `NumberLocks` list URL must also be stored in an environment variable. This variable does not yet exist in the catalog. **Developer must create it and return the variable name to Claude.**
+---
+
+## SharePoint column model for DelovodniBroj
+
+Registry numbers must be stored in three separate columns on both `Svi predmeti` and `Dokumenta`. Do not rely on a single formatted text column for filtering or sequence checking.
+
+| Display name | Suggested internal name | Type | Example | Notes |
+|---|---|---|---|---|
+| DelovodniBrojNumber | DelovodniBrojNumber | Number (integer) | `42` | Numeric sequence value; used for max() queries and uniqueness |
+| DelovodniBrojText | DelovodniBrojText | Single line text | `"DK01-42/2026"` | Formatted display string; generated by the flow after assignment |
+| DelovodniBrojGodina | DelovodniBrojGodina | Number (integer) | `2026` | Year component; used for year-scoped filtering |
+| DelovodnaKnjigaKey | DelovodnaKnjigaKey | Single line text | `"DK01"` | Registry book key; used for book-scoped filtering |
+
+### DelovodniBrojText format
+
+```
+{DelovodnaKnjigaKey}-{DelovodniBrojNumber}/{DelovodniBrojGodina}
+```
+
+Example: `DK01-42/2026`
+
+The format must match the format defined in `AppConfig / DelovodneKnjige` for the registry book. If the format is configurable, read it from AppConfig and apply it. Default to the above pattern.
+
+### Unique constraint
+
+- `DelovodniBrojNumber` on `Svi predmeti`: **Enforce unique values = Yes**, combined with `DelovodnaKnjigaKey` and `DelovodniBrojGodina` as a logical composite key. SharePoint does not support composite unique constraints natively; enforce uniqueness in the flow via the duplicate check (step 5) and rely on `DelovodniBrojNumber` unique index as a final safety net within a single registry book context.
+- `DelovodniBrojText` on `Svi predmeti`: **Enforce unique values = Yes**. This is the widest safety net because the text includes the book key and year.
 
 ---
 
@@ -45,11 +91,11 @@ The `NumberLocks` list URL must also be stored in an environment variable. This 
 |---|---|---|---|
 | `sviPredmetiItemId` | Integer | Yes | ID of the `Svi predmeti` item that needs a number |
 | `dokumentaItemId` | Integer | Yes | ID of the `Dokumenta` file item |
-| `registryBookKey` | String | Yes | Key from AppConfig DelovodneKnjige, used to build LockKey |
+| `registryBookKey` | String | Yes | Key from AppConfig `DelovodneKnjige`; used to build `LockKey` and `DelovodnaKnjigaKey` |
 | `activeYear` | Integer | Yes | Active year for this registry book |
-| `useReservedNumber` | Boolean | Yes | `true` if the caller is using a specific reserved number |
-| `reservedNumber` | Integer | No | Required when `useReservedNumber = true`; the reserved number to use |
-| `reservedNumberItemId` | Integer | No | ID of the item in `Rezervisani brojevi` to delete after use |
+| `useReservedNumber` | Boolean | Yes | `true` if the caller is requesting assignment of a specific reserved number |
+| `reservedNumber` | Integer | No | Required when `useReservedNumber = true`; the specific reserved number to assign |
+| `reservedNumberItemId` | Integer | No | ID of the item in `Rezervisani brojevi` to delete on success |
 | `requestedByEmail` | String | Yes | Email of the user who initiated the registration |
 
 ---
@@ -58,156 +104,210 @@ The `NumberLocks` list URL must also be stored in an environment variable. This 
 
 ```json
 {
-  "success": true,
+  "success": false,
   "code": "OK",
-  "message": "Registry number assigned successfully.",
-  "assignedNumber": 42,
+  "message": "Delovodni broj uspešno dodeljen.",
+  "itemId": 101,
+  "documentId": 55,
+  "delovodniBrojNumber": 42,
+  "delovodniBrojText": "DK01-42/2026",
+  "registryYear": 2026,
+  "technicalStatus": "Completed",
+  "requiresRecovery": false,
+  "blockNewRegistrations": false,
   "technicalDetail": ""
 }
 ```
 
+### Output field descriptions
+
+| Field | Type | Notes |
+|---|---|---|
+| `success` | Boolean | `true` only when number is assigned and both Svi predmeti and Dokumenta are updated |
+| `code` | String | Machine-readable result code; see table below |
+| `message` | String | User-friendly message in Serbian |
+| `itemId` | Integer | Echo of `sviPredmetiItemId` input; helps caller correlate response |
+| `documentId` | Integer | Echo of `dokumentaItemId` input |
+| `delovodniBrojNumber` | Integer | The numeric value assigned; 0 if not assigned |
+| `delovodniBrojText` | String | The formatted display string; empty if not assigned |
+| `registryYear` | Integer | Year for which the number was assigned |
+| `technicalStatus` | String | Final `TechnicalStatus` value written to `Svi predmeti` |
+| `requiresRecovery` | Boolean | `true` when the flow has left data in an inconsistent state that requires admin action |
+| `blockNewRegistrations` | Boolean | `true` when the caller must prevent any further registration attempts |
+| `technicalDetail` | String | Internal error detail for AuditLog/support; not shown to end users |
+
 ### Output codes
 
-| Code | Success | Meaning |
-|---|---|---|
-| `OK` | true | Number assigned successfully |
-| `LOCK_BUSY` | false | Another flow currently holds the lock; caller should retry after a brief wait |
-| `LOCK_EXPIRED` | false | An expired lock exists; recovery validation required before proceeding |
-| `BLOCKED_RECOVERY_REQUIRED` | false | One or more FailedNeedsRecovery items exist; admin must resolve |
-| `DUPLICATE_DETECTED` | false | The candidate number was already found in Svi predmeti; critical failure |
-| `RESERVED_NOT_FOUND` | false | Reserved number not found in Rezervisani brojevi |
-| `ASSIGN_FAILED` | false | Write to Svi predmeti failed; TechnicalStatus set to FailedNeedsRecovery |
-| `SYNC_FAILED` | false | Write to Dokumenta failed; TechnicalStatus set to MetadataSyncFailed |
-| `INTERNAL_ERROR` | false | Unhandled error in flow |
+| Code | `success` | `requiresRecovery` | `blockNewRegistrations` | Meaning |
+|---|---|---|---|---|
+| `OK` | true | false | false | Number assigned; both lists updated; all cleanup complete |
+| `OK_SYNC_PENDING` | true | true | true | Number assigned in Svi predmeti; Dokumenta sync failed; recovery required before new registrations |
+| `LOCK_BUSY` | false | false | false | Another flow holds the lock; no data written; caller may retry |
+| `LOCK_EXPIRED` | false | false | true | Expired lock detected; transaction state unknown; admin must validate before proceeding |
+| `BLOCKED_RECOVERY_REQUIRED` | false | false | true | FailedNeedsRecovery or MetadataSyncFailed item exists; admin must resolve first |
+| `NEXT_NUMBER_IS_RESERVED` | false | false | false | Next sequential number is in Rezervisani brojevi; operator must use reserved path or cancel the reservation |
+| `COUNTER_OUT_OF_SYNC` | false | false | true | AppConfig counter is behind Svi predmeti max; counter integrity check required before assignment |
+| `DUPLICATE_DETECTED` | false | true | true | Candidate number already exists in Svi predmeti; critical — FailedNeedsRecovery set |
+| `RESERVED_NOT_FOUND` | false | false | false | Reserved number not in Rezervisani brojevi; no data written |
+| `ASSIGN_FAILED` | false | true | true | Write to Svi predmeti failed; FailedNeedsRecovery set |
+| `INTERNAL_ERROR` | false | true | true | Unhandled exception; FailedNeedsRecovery set if data was partially written |
+
+> **Caller responsibility:** `CF_DocCentral_CreateDocumentTransaction` must check `blockNewRegistrations` in the response and, if `true`, persist the blocking state so Canvas app knows to suspend the registration form.
+
+---
+
+## Variable initialization
+
+Declare all variables before the Try scope. Power Automate requires variables to be initialized at the top level of the flow.
+
+```
+varLockKey                (String)   concat(inputs.registryBookKey, '_', string(inputs.activeYear))
+varLockItemId             (Integer)  0
+varLockAcquired           (Boolean)  false
+varLockBelongsToThisRun   (Boolean)  false
+varNextNumber             (Integer)  0
+varDelovodniBrojText      (String)   ""
+varFlowSuccess            (Boolean)  false
+varSyncSuccess            (Boolean)  false
+varOutputCode             (String)   "INTERNAL_ERROR"
+varOutputMessage          (String)   ""
+varTechnicalDetail        (String)   ""
+varRequiresRecovery       (Boolean)  false
+varBlockNewRegistrations  (Boolean)  false
+varConfigCounter          (Integer)  0
+varMaxAssigned            (Integer)  0
+varAppConfigItemId        (Integer)  0
+varAppConfigJson          (String)   ""
+```
 
 ---
 
 ## Detailed action sequence
 
-The flow is structured in three scopes: **Try**, **Catch**, and **Finally**. All SharePoint write actions are in Try. Catch handles failures. Finally releases the lock unconditionally.
+### TRY SCOPE
 
-### 0. Initialize variables
-
-```
-Initialize variable: varLockItemId        (Integer, 0)
-Initialize variable: varLockAcquired      (Boolean, false)
-Initialize variable: varAssignedNumber    (Integer, 0)
-Initialize variable: varFlowSuccess       (Boolean, false)
-Initialize variable: varOutputCode        (String, "INTERNAL_ERROR")
-Initialize variable: varOutputMessage     (String, "")
-Initialize variable: varTechnicalDetail   (String, "")
-Initialize variable: varLockKey           (String, concat(triggerBody()?['registryBookKey'], '_', triggerBody()?['activeYear']))
-```
+All write operations are inside the Try scope. The Catch scope handles any unhandled exception. The Finally scope handles lock cleanup. The flow always ends at the Respond action with populated output variables.
 
 ---
-
-### TRY SCOPE
 
 **Step 1 — Attempt to create the lock**
 
 Action: SharePoint — Create item in `NumberLocks`
 
-```
-Title:               variables('varLockKey')
-LockKey:             variables('varLockKey')
-LockedBy:            triggerBody()?['requestedByEmail']
-LockedAt:            utcNow()
-ExpiresAt:           addMinutes(utcNow(), 5)
-FlowRunId:           workflow()?['run']?['id']
-Status:              Active
-RelatedItemId:       triggerBody()?['sviPredmetiItemId']
-RelatedDocumentId:   triggerBody()?['dokumentaItemId']
-```
-
-Configure action: **Configure run after → Run this action even if the previous action failed** is NOT needed here — this is the first action.
-
-If this action fails with HTTP 400 / "Column 'LockKey' has a duplicate value" → the lock is already held by another flow. Go to the collision handler.
-
-Add a **Configure run after** parallel branch:
-
-- If Create item **succeeded** → continue to Step 2
-- If Create item **failed** → go to Collision Handler
-
-**Collision Handler (parallel branch on failure):**
+Fields to set:
 
 ```
-Set variable: varOutputCode = "LOCK_BUSY"
-Set variable: varOutputMessage = "Sistem je trenutno zauzet dodavanjem delovodnog broja. Pokušajte ponovo za nekoliko sekundi."
-Set variable: varTechnicalDetail = concat("Lock collision on key: ", variables('varLockKey'))
-Terminate flow (Cancel) — this exits the Try scope and goes to Finally
+Title:             varLockKey
+LockKey:           varLockKey
+LockedBy:          inputs.requestedByEmail
+LockedAt:          utcNow()
+ExpiresAt:         addMinutes(utcNow(), 5)
+FlowRunId:         workflow()?['run']?['id']
+Status:            Active
+RelatedItemId:     inputs.sviPredmetiItemId
+RelatedDocumentId: inputs.dokumentaItemId
 ```
 
-> Note: Terminate with "Cancelled" status, not "Failed", so that Finally still runs.
+**Retry policy on this action: None.** A duplicate key conflict (HTTP 400) is an expected business condition, not a transient error. Retrying it would queue the flow behind the other lock holder and produce unpredictable behavior.
 
-After successful create:
+**Configure run after:** this is the first action; no configuration needed.
 
-```
-Set variable: varLockItemId = outputs('Create_lock_item')?['body/ID']
-Set variable: varLockAcquired = true
-```
+After the action, add a **Condition** on `outputs('Create_NumberLock')?['statusCode']`:
+
+- **If 2xx (succeeded):**
+  ```
+  Set varLockItemId = outputs('Create_NumberLock')?['body/ID']
+  Set varLockAcquired = true
+  Set varLockBelongsToThisRun = true
+  → Proceed to Step 1b
+  ```
+
+- **If failed (any error):**
+  ```
+  Set varOutputCode = "LOCK_BUSY"
+  Set varOutputMessage = "Sistem je trenutno zauzet dodavanjem delovodnog broja. Pokušajte ponovo za nekoliko sekundi."
+  Set varTechnicalDetail = concat("Lock create failed on key: ", varLockKey, " | Error: ", actions('Create_NumberLock')?['error']?['message'])
+  Write AuditLog: LockCollisionDetected, Warning
+  → Skip to Finally scope (do not Terminate; just set varFlowSuccess=false and fall through to the Respond action via scope exit)
+  ```
+
+  Implementation note: structure the remaining steps inside a condition block that only runs when `varLockBelongsToThisRun = true`. This is the Power Automate equivalent of "exit early without Terminate."
 
 ---
 
-**Step 1b — Verify no other active lock with same key**
+**Step 1b — Verify no other Active lock with same key**
 
-Even though we just created a lock, verify only one Active lock exists for this key. This catches edge cases where the unique constraint is temporarily not enforced.
+This step defends against the rare case where the unique constraint temporarily did not fire (e.g., column constraint not yet active in a new environment).
 
 Action: SharePoint — Get items from `NumberLocks`
 
 ```
-Filter: LockKey eq '{varLockKey}' and Status eq 'Active'
-Top: 5
+Filter: LockKey eq 'varLockKey' and Status eq 'Active'
+Top:    5
+Select: ID, FlowRunId, ExpiresAt
 ```
 
-If item count > 1:
+Condition: `length(body('Get_active_locks')?['value']) > 1`
 
-```
-Set variable: varOutputCode = "LOCK_BUSY"
-Set variable: varOutputMessage = "Sistem je trenutno zauzet."
-Terminate (Cancelled)
-```
+- If true (more than one Active lock for this key):
+  ```
+  Set varOutputCode = "LOCK_BUSY"
+  Set varOutputMessage = "Sistem je trenutno zauzet."
+  Set varLockBelongsToThisRun = false   ← do NOT release our own lock in Finally (it was part of the collision)
+  Write AuditLog: LockCollisionDetected, Warning, TechnicalDetail = "Multiple active locks detected"
+  → Exit step block
+  ```
 
 ---
 
-**Step 1c — Check for expired active locks from previous runs**
+**Step 1c — Detect expired Active lock from a previous run**
 
 Action: SharePoint — Get items from `NumberLocks`
 
 ```
-Filter: LockKey eq '{varLockKey}' and Status eq 'Active' and ExpiresAt lt '{utcNow()}'
-Top: 1
+Filter: LockKey eq 'varLockKey' and Status eq 'Active' and ExpiresAt lt 'utcNow()' and ID ne 'varLockItemId'
+Top:    1
 Select: ID, ExpiresAt, RelatedItemId, FlowRunId
 ```
 
-If count > 0 AND the item found is NOT the lock we just created (check by ID):
+Condition: `length(body('Get_expired_locks')?['value']) > 0`
 
-```
-Write AuditLog (see AuditLog section): EventType = LockExpiredDetected
-Set variable: varOutputCode = "LOCK_EXPIRED"
-Set variable: varOutputMessage = "Prethodna operacija nije završena. Administrator mora proveriti stanje registracije pre nastavka."
-Terminate (Cancelled)
-```
+- If true (an expired lock from a different run exists):
+  ```
+  Set varOutputCode = "LOCK_EXPIRED"
+  Set varOutputMessage = "Prethodna operacija nije završena. Administrator mora proveriti stanje registracije pre nastavka."
+  Set varBlockNewRegistrations = true
+  Set varTechnicalDetail = concat("Expired lock ID: ", first(body('Get_expired_locks')?['value'])?['ID'], " | ExpiresAt: ", first(body('Get_expired_locks')?['value'])?['ExpiresAt'])
+  Write AuditLog: LockExpiredDetected, Warning
+  → Exit step block (our lock will be Released in Finally since no data was written)
+  ```
 
 ---
 
-**Step 2 — Check FailedNeedsRecovery**
+**Step 2 — Check for blocking TechnicalStatus items**
+
+This step enforces that no new number is assigned while any item in `Svi predmeti` has `TechnicalStatus = FailedNeedsRecovery` OR `TechnicalStatus = MetadataSyncFailed`.
 
 Action: SharePoint — Get items from `Svi predmeti`
 
 ```
-Filter: TechnicalStatus eq 'FailedNeedsRecovery'
-Top: 1
+Filter: TechnicalStatus eq 'FailedNeedsRecovery' or TechnicalStatus eq 'MetadataSyncFailed'
+Top:    1
 Select: ID, TechnicalStatus
 ```
 
-If count > 0:
+Condition: `length(body('Get_blocking_items')?['value']) > 0`
 
-```
-Write AuditLog: EventType = NumberAssignmentBlocked
-Set variable: varOutputCode = "BLOCKED_RECOVERY_REQUIRED"
-Set variable: varOutputMessage = "Registracija je privremeno blokirana. Administrator mora rešiti otvorene probleme."
-Terminate (Cancelled)
-```
+- If true:
+  ```
+  Set varOutputCode = "BLOCKED_RECOVERY_REQUIRED"
+  Set varOutputMessage = "Registracija je privremeno blokirana. Administrator mora rešiti otvorene probleme pre nastavka."
+  Set varBlockNewRegistrations = true
+  Write AuditLog: NumberAssignmentBlocked, Warning,
+      TechnicalDetail = concat("Blocking item ID: ", first(body('Get_blocking_items')?['value'])?['ID'],
+                               " | TechnicalStatus: ", first(body('Get_blocking_items')?['value'])?['TechnicalStatus'])
+  → Exit step block (our lock will be Released in Finally since no data was written)
+  ```
 
 ---
 
@@ -217,45 +317,78 @@ Action: SharePoint — Get items from `AppConfig`
 
 ```
 Filter: Title eq 'DelovodneKnjige'
-Top: 1
+Top:    1
 Select: ID, Config
 ```
 
-Parse the `Config` JSON column.
+Set `varAppConfigItemId = first(body(...))?['ID']`
 
-Find the active registry book entry where `Key eq registryBookKey AND IsActive eq true`.
+Action: Parse JSON on the `Config` field value.
+
+Find the array entry where `Key eq inputs.registryBookKey AND IsActive eq true AND ActiveYear eq inputs.activeYear`.
+
+If no matching entry found:
+```
+Set varOutputCode = "INTERNAL_ERROR"
+Set varOutputMessage = "Aktivna delovodna knjiga nije pronađena u konfiguraciji."
+Set varBlockNewRegistrations = false
+→ Exit step block
+```
 
 Extract:
-- `varActiveYear` — from entry's `ActiveYear` field
-- `varConfigCounter` — from entry's `CurrentCounter` field
-- `varAppConfigItemId` — SharePoint ID of the AppConfig item (needed for update in step 10)
-
-If no active registry book found: set error, terminate.
+```
+varConfigCounter   = entry.CurrentCounter   (integer)
+varAppConfigJson   = full Config JSON string (needed for step 10 reconstruction)
+```
 
 ---
 
-**Step 4 — Determine next number**
+**Step 4 — Determine next number and validate counter integrity**
 
 Action: SharePoint — Get items from `Svi predmeti`
 
 ```
-OData query:
-$filter=DelovodnaKnjiga eq '{registryBookKey}' and DatumZavodjenja ge '2026-01-01' and DatumZavodjenja lt '2027-01-01'
-$orderby=DelovodniBroj desc
-$top=1
-$select=ID,DelovodniBroj
+OData filter: DelovodnaKnjigaKey eq 'inputs.registryBookKey'
+              and DelovodniBrojGodina eq inputs.activeYear
+$orderby:     DelovodniBrojNumber desc
+$top:         1
+$select:      ID, DelovodniBrojNumber
 ```
 
-> **Note:** The year filter above is illustrative. Use the actual year range calculated from `activeYear`. Replace hardcoded dates with expressions.
+Set:
+```
+varMaxAssigned = if item found: int(first item DelovodniBrojNumber) else: 0
+varNextNumber  = varConfigCounter + 1
+```
+
+**Counter integrity check — do not silently advance past the counter:**
+
+Condition A: `varMaxAssigned > varConfigCounter`
+
+This means `Svi predmeti` contains numbers higher than the AppConfig counter. The counter is stale or the last AppConfig update failed (REC-005 state from `docs/15-recovery-scenarios.md`).
 
 ```
-varMaxAssigned = if item found: int(first item DelovodniBroj) else: 0
-varNextNumber  = max(varMaxAssigned, varConfigCounter) + 1
+Set varOutputCode = "COUNTER_OUT_OF_SYNC"
+Set varOutputMessage = "Brojač delovodnih brojeva nije sinhronizovan. Administrator mora proveriti stanje pre nastavka."
+Set varBlockNewRegistrations = true
+Set varTechnicalDetail = concat("varConfigCounter=", varConfigCounter, " varMaxAssigned=", varMaxAssigned,
+                                " registryBookKey=", inputs.registryBookKey, " year=", inputs.activeYear)
+Write AuditLog: CounterOutOfSync, Warning
+→ Exit step block (our lock will be Released in Finally since no data was written)
 ```
 
-If `varConfigCounter < varMaxAssigned`: log AuditLog warning (counter was stale).
+Condition B: `varMaxAssigned eq varConfigCounter` → system is consistent. `varNextNumber = varConfigCounter + 1`. Continue.
 
-If reserved number path (`useReservedNumber = true`): `varNextNumber = reservedNumber` (the input parameter, not calculated).
+Condition C: `varMaxAssigned lt varConfigCounter` → AppConfig counter is ahead of Svi predmeti max. This is normal if a previous assignment incremented the counter but Svi predmeti write succeeded only for `DelovodniBrojNumber` below the counter value. Use `varConfigCounter + 1`. Log AuditLog Info noting the gap (it is expected under normal operations where counter increments before Svi predmeti write).
+
+**Reserved number path override:**
+
+Condition: `inputs.useReservedNumber eq true`
+
+```
+Set varNextNumber = inputs.reservedNumber
+— Do not recalculate from counter; the caller has already determined the reserved number to use
+```
 
 ---
 
@@ -264,60 +397,79 @@ If reserved number path (`useReservedNumber = true`): `varNextNumber = reservedN
 Action: SharePoint — Get items from `Svi predmeti`
 
 ```
-Filter: DelovodniBroj eq '{varNextNumber}'
-Top: 1
+Filter: DelovodniBrojNumber eq varNextNumber
+        and DelovodnaKnjigaKey eq 'inputs.registryBookKey'
+        and DelovodniBrojGodina eq inputs.activeYear
+Top:    1
+Select: ID, DelovodniBrojNumber, DelovodniBrojText
 ```
 
-If count > 0:
+Condition: `length(body('Get_duplicate_check')?['value']) > 0`
 
-```
-Set variable: varOutputCode = "DUPLICATE_DETECTED"
-Set variable: varTechnicalDetail = concat("Duplicate check failed for number: ", varNextNumber)
-Write AuditLog: EventType = NumberAssignmentFailed, Severity = Critical
-Update Svi predmeti item TechnicalStatus = FailedNeedsRecovery
-Update NumberLocks item Status = Failed, ErrorCode = DUPLICATE_DETECTED
-Terminate (Cancelled)
-```
+- If duplicate found:
+  ```
+  Set varOutputCode = "DUPLICATE_DETECTED"
+  Set varRequiresRecovery = true
+  Set varBlockNewRegistrations = true
+  Set varTechnicalDetail = concat("Duplicate number ", varNextNumber, " already exists in item ID: ",
+                                   first(body('Get_duplicate_check')?['value'])?['ID'])
+  Write AuditLog: NumberAssignmentFailed, Critical
+  Update Svi predmeti item (inputs.sviPredmetiItemId): TechnicalStatus = FailedNeedsRecovery
+  Update NumberLocks item (varLockItemId): Status = Failed, ErrorCode = "DUPLICATE_DETECTED"
+  Set varLockBelongsToThisRun = false   ← do NOT overwrite to Released in Finally; leave as Failed
+  → Exit step block
+  ```
 
 ---
 
 **Step 6 — Verify candidate number against Rezervisani brojevi**
 
-If `useReservedNumber = false`:
+This step has two branches depending on `useReservedNumber`.
+
+**Branch A: `useReservedNumber = false`**
 
 Action: SharePoint — Get items from `Rezervisani brojevi`
 
 ```
-Filter: RezervisaniBroj eq '{varNextNumber}'
-Top: 1
+Filter: RezervisaniBroj eq varNextNumber
+Top:    1
+Select: ID, RezervisaniBroj
 ```
 
-If reserved entry found: the number is reserved but caller is not on the reserved path.
+Condition: `length(body('Get_reserved_check')?['value']) > 0`
 
-```
-Set variable: varOutputCode = "INTERNAL_ERROR"
-Set variable: varTechnicalDetail = concat("Candidate number ", varNextNumber, " is in Rezervisani brojevi but useReservedNumber=false")
-Write AuditLog: EventType = NumberAssignmentFailed, Severity = Warning
-```
+- If reserved entry found:
+  ```
+  Set varOutputCode = "NEXT_NUMBER_IS_RESERVED"
+  Set varOutputMessage = concat("Sledeći redni broj (", varNextNumber, ") je rezervisan. Operator mora odabrati rezervisani put ili otkazati rezervaciju pre nastavka.")
+  Set varRequiresRecovery = false
+  Set varBlockNewRegistrations = false
+  Set varTechnicalDetail = concat("Number ", varNextNumber, " is in Rezervisani brojevi, ID: ",
+                                   first(body('Get_reserved_check')?['value'])?['ID'])
+  Write AuditLog: NumberAssignmentBlocked, Warning, EventType = NextNumberReserved
+  → Exit step block (our lock will be Released in Finally; no data written)
+  ```
 
-Recommended behavior: increment `varNextNumber` by 1 and repeat steps 5 and 6. Limit to 10 attempts to prevent infinite loop. If after 10 attempts all candidates are reserved, return `INTERNAL_ERROR`.
+  **Do not increment varNextNumber and retry.** That would silently skip the reserved number, which is forbidden.
 
-If `useReservedNumber = true`:
+**Branch B: `useReservedNumber = true`**
 
 Action: SharePoint — Get items from `Rezervisani brojevi`
 
 ```
-Filter: RezervisaniBroj eq '{reservedNumber}'
-Top: 1
+Filter: RezervisaniBroj eq inputs.reservedNumber
+Top:    1
+Select: ID, RezervisaniBroj
 ```
 
-If not found:
+Condition: `length(body('Get_reserved_verify')?['value']) eq 0`
 
-```
-Set variable: varOutputCode = "RESERVED_NOT_FOUND"
-Set variable: varOutputMessage = "Rezervisani broj nije pronađen. Moguće je da je već iskorišćen."
-Terminate (Cancelled)
-```
+- If not found:
+  ```
+  Set varOutputCode = "RESERVED_NOT_FOUND"
+  Set varOutputMessage = "Rezervisani broj nije pronađen. Možda je već iskorišćen ili je broj pogrešan."
+  → Exit step block (our lock will be Released in Finally; no data written)
+  ```
 
 ---
 
@@ -326,103 +478,156 @@ Terminate (Cancelled)
 Action: SharePoint — Update item in `Svi predmeti`
 
 ```
-Item ID: sviPredmetiItemId
+Item ID:         inputs.sviPredmetiItemId
 TechnicalStatus: NumberAssignmentInProgress
+```
+
+Retry policy: Fixed, Count = 3, Interval = PT5S.
+
+If update fails (configure run after failed):
+```
+Set varOutputCode = "ASSIGN_FAILED"
+Set varRequiresRecovery = true
+Set varBlockNewRegistrations = true
+Write AuditLog: NumberAssignmentFailed, Critical, TechnicalDetail = error message
+Update NumberLocks (varLockItemId): Status = Failed, ErrorCode = "ASSIGN_FAILED_PRESTATUS"
+Set varLockBelongsToThisRun = false
+→ Exit step block
 ```
 
 ---
 
-**Step 8 — Write DelovodniBroj to Svi predmeti**
+**Step 8 — Write DelovodniBroj columns to Svi predmeti**
+
+Build the formatted text before writing:
+```
+Set varDelovodniBrojText = concat(inputs.registryBookKey, '-', string(varNextNumber), '/', string(inputs.activeYear))
+```
 
 Action: SharePoint — Update item in `Svi predmeti`
 
 ```
-Item ID: sviPredmetiItemId
-DelovodniBroj: varNextNumber
+Item ID:               inputs.sviPredmetiItemId
+DelovodniBrojNumber:   varNextNumber
+DelovodniBrojText:     varDelovodniBrojText
+DelovodniBrojGodina:   inputs.activeYear
+DelovodnaKnjigaKey:    inputs.registryBookKey
 ```
 
-Configure: if this action fails, go to failure handler:
+Retry policy: Fixed, Count = 3, Interval = PT5S.
 
+If update fails (configure run after failed):
 ```
-Update Svi predmeti TechnicalStatus = FailedNeedsRecovery
-Update NumberLocks Status = Failed, ErrorCode = ASSIGN_FAILED
-Write AuditLog: NumberAssignmentFailed, Severity = Critical
-Set varOutputCode = ASSIGN_FAILED
-Set varFlowSuccess = false
-Terminate (Cancelled)
+Set varOutputCode = "ASSIGN_FAILED"
+Set varRequiresRecovery = true
+Set varBlockNewRegistrations = true
+Set varTechnicalDetail = concat("Step 8 failed: ", error message)
+Write AuditLog: NumberAssignmentFailed, Critical
+Update Svi predmeti (inputs.sviPredmetiItemId): TechnicalStatus = FailedNeedsRecovery
+Update NumberLocks (varLockItemId): Status = Failed, ErrorCode = "ASSIGN_FAILED"
+Set varLockBelongsToThisRun = false
+→ Exit step block
 ```
 
 ---
 
-**Step 9 — Write DelovodniBroj to Dokumenta**
+**Step 9 — Write DelovodniBroj columns to Dokumenta**
 
 Action: SharePoint — Update file properties in `Dokumenta`
 
 ```
-Item ID: dokumentaItemId
-DelovodniBroj: varNextNumber
-TechnicalStatus: Completed
+Item ID:               inputs.dokumentaItemId
+DelovodniBrojNumber:   varNextNumber
+DelovodniBrojText:     varDelovodniBrojText
+DelovodniBrojGodina:   inputs.activeYear
+DelovodnaKnjigaKey:    inputs.registryBookKey
 ```
 
-If this action fails:
+Retry policy: Fixed, Count = 3, Interval = PT5S.
 
+If update **succeeds**:
 ```
-Update Svi predmeti TechnicalStatus = MetadataSyncFailed
-Write AuditLog: MetadataSyncFailed, Severity = Warning
-Set varOutputCode = SYNC_FAILED
-Set varOutputMessage = "Broj je zaveden ali sinhronizacija sa bibliotekom dokumenata nije uspela. Koristite oporavak."
-Set varFlowSuccess = false
-— do NOT set FailedNeedsRecovery (this is lower severity)
-— do NOT Terminate; continue to step 10 to update counter
+Set varSyncSuccess = true
+```
+
+If update **fails** (configure run after failed):
+```
+Set varSyncSuccess = false
+Set varOutputCode = "OK_SYNC_PENDING"
+Set varOutputMessage = "Delovodni broj je zaveden u Svi predmeti ali sinhronizacija sa bibliotekom dokumenata nije uspela. Potreban oporavak pre naredne registracije."
+Set varRequiresRecovery = true
+Set varBlockNewRegistrations = true
+Set varTechnicalDetail = concat("Step 9 Dokumenta sync failed: ", error message)
+Update Svi predmeti (inputs.sviPredmetiItemId): TechnicalStatus = MetadataSyncFailed
+Write AuditLog: MetadataSyncFailed, Warning
+— do NOT set FailedNeedsRecovery; MetadataSyncFailed is a distinct, lower-severity state
+— do NOT set varLockBelongsToThisRun = false; lock will still be Released in Finally
+— continue to step 10 so AppConfig counter is updated (number IS assigned in Svi predmeti)
 ```
 
 ---
 
 **Step 10 — Update AppConfig CurrentCounter**
 
+Reconstruct the AppConfig `Config` JSON: replace `CurrentCounter` for the matching registry book entry with `varNextNumber`. All other entries and books in the JSON array must remain unchanged.
+
 Action: SharePoint — Update item in `AppConfig`
 
-Reconstruct the `Config` JSON with the updated `CurrentCounter = varNextNumber` for the matching registry book entry.
-
-If this action fails:
-
 ```
-Write AuditLog: EventType = AppConfigUpdateFailed, Severity = Warning
+Item ID: varAppConfigItemId
+Config:  [reconstructed JSON string]
+```
+
+Retry policy: Fixed, Count = 3, Interval = PT5S.
+
+If update fails:
+```
+Write AuditLog: AppConfigUpdateFailed, Warning
+Set varTechnicalDetail = concat(varTechnicalDetail, " | AppConfig counter update failed: ", error message)
 — do NOT set FailedNeedsRecovery
+— do NOT block new registrations for counter-only failure; the next flow run self-corrects via the integrity check at step 4
 — continue
 ```
 
 ---
 
-**Step 11 — Delete used reserved number (if applicable)**
+**Step 11 — Delete used reserved number (reserved path only)**
 
-Condition: `useReservedNumber = true`
+Condition: `inputs.useReservedNumber eq true AND varSyncSuccess eq true`
+
+> Only delete the reserved number entry if Dokumenta sync succeeded. If sync failed (`MetadataSyncFailed`), skip deletion here. The recovery flow will delete the entry after confirming sync is complete.
 
 Action: SharePoint — Delete item from `Rezervisani brojevi`
 
 ```
-Item ID: reservedNumberItemId
+Item ID: inputs.reservedNumberItemId
 ```
+
+Retry policy: Fixed, Count = 3, Interval = PT5S.
 
 If delete fails:
-
 ```
-Write AuditLog: ReservedNumberDeletionFailed, Severity = Warning
-Set ErrorCode on NumberLocks item = RESERVED_DELETE_FAILED
+Write AuditLog: ReservedNumberDeletionFailed, Warning
+Set ErrorCode on NumberLocks (varLockItemId) = "RESERVED_DELETE_FAILED"
 — do NOT set FailedNeedsRecovery
-— recovery flow will retry deletion
+— recovery flow handles this via REC-003
+```
+
+If delete succeeds:
+```
+Write AuditLog: ReservedNumberUsed, Info
 ```
 
 ---
 
-**Step 12 — Set TechnicalStatus = Completed**
+**Step 12 — Set TechnicalStatus = Completed (success path only)**
 
-Condition: run only if `varFlowSuccess` is still true (no sync failure in step 9 set it to false) OR if you want to always mark Completed even after MetadataSyncFailed. Recommended: set Completed only if step 9 succeeded.
+Condition: `varSyncSuccess eq true AND varOutputCode ne 'ASSIGN_FAILED' AND varOutputCode ne 'DUPLICATE_DETECTED'`
 
 Action: SharePoint — Update item in `Svi predmeti`
 
 ```
-Item ID: sviPredmetiItemId
+Item ID:         inputs.sviPredmetiItemId
 TechnicalStatus: Completed
 ```
 
@@ -430,137 +635,175 @@ TechnicalStatus: Completed
 
 **Step 13 — Write AuditLog success**
 
-See AuditLog entries section.
+Condition: `varSyncSuccess eq true`
 
 ```
-EventType: NumberAssigned
-Severity: Info
-RelatedItemId: sviPredmetiItemId
-RelatedDocumentId: dokumentaItemId
-UserEmail: requestedByEmail
+Write AuditLog:
+    EventType:        NumberAssigned
+    Severity:         Info
+    Title:            concat("Delovodni broj ", varDelovodniBrojText, " dodeljen")
+    RelatedItemId:    inputs.sviPredmetiItemId
+    RelatedDocumentId: inputs.dokumentaItemId
+    UserEmail:        inputs.requestedByEmail
+    TechnicalDetails: concat("Number=", varNextNumber,
+                             " | Text=", varDelovodniBrojText,
+                             " | Book=", inputs.registryBookKey,
+                             " | Year=", inputs.activeYear,
+                             " | Reserved=", string(inputs.useReservedNumber))
 ```
-
-Include `assignedNumber` in the TechnicalDetails field.
 
 ---
 
-**Step 14 — Set success outputs**
+**Step 14 — Set success output variables**
+
+Condition: `varSyncSuccess eq true`
 
 ```
-Set variable: varAssignedNumber = varNextNumber
-Set variable: varFlowSuccess = true
-Set variable: varOutputCode = OK
-Set variable: varOutputMessage = "Delovodni broj uspešno dodeljen."
+Set varFlowSuccess       = true
+Set varOutputCode        = "OK"
+Set varOutputMessage     = concat("Delovodni broj ", varDelovodniBrojText, " uspešno dodeljen.")
+Set varRequiresRecovery  = false
+Set varBlockNewRegistrations = false
 ```
 
 ---
 
 ### CATCH SCOPE
 
-The Catch scope runs if any action inside Try throws an unhandled exception (not covered by inline failure handling above).
+The Catch scope runs only on an unhandled exception that escaped all inline failure handling in Try.
 
 ```
-Compose technical error: concat(actions('failing_action')['error']['code'], ' — ', actions('failing_action')['error']['message'])
-Set variable: varTechnicalDetail = [composed error]
-Set variable: varOutputCode = INTERNAL_ERROR
-Set variable: varOutputMessage = "Interna greška. Kontaktirajte administratora."
+Compose technical error:
+    concat("Unhandled exception in CF_DocCentral_AssignRegistryNumber",
+           " | Action: ", actions()?['name'],
+           " | Code: ",   result()?[0]?['error']?['code'],
+           " | Message: ", result()?[0]?['error']?['message'])
+
+Set varTechnicalDetail      = composed error string
+Set varOutputCode           = "INTERNAL_ERROR"
+Set varOutputMessage        = "Interna greška prilikom dodele delovodnog broja. Kontaktirajte administratora."
+Set varRequiresRecovery     = true
+Set varBlockNewRegistrations = true
 
 Write AuditLog:
-    EventType: NumberAssignmentFailed
-    Severity: Critical
+    EventType:     NumberAssignmentFailed
+    Severity:      Critical
     TechnicalDetails: varTechnicalDetail
 
-If varLockAcquired = true AND Svi predmeti item TechnicalStatus was changed:
-    Update Svi predmeti TechnicalStatus = FailedNeedsRecovery
-    Update NumberLocks Status = Failed, ErrorCode = INTERNAL_ERROR
+Condition: varLockAcquired = true AND varLockBelongsToThisRun = true
+    Update Svi predmeti (inputs.sviPredmetiItemId): TechnicalStatus = FailedNeedsRecovery
+    Update NumberLocks (varLockItemId): Status = Failed, ErrorCode = "INTERNAL_ERROR"
+    Set varLockBelongsToThisRun = false   ← do not overwrite to Released in Finally
 ```
 
 ---
 
 ### FINALLY SCOPE
 
-The Finally scope runs unconditionally after Try or Catch.
+The Finally scope runs after Try completes (successfully or after a controlled exit) and after Catch.
+
+Lock state is determined by `varLockBelongsToThisRun` and `varFlowSuccess`:
 
 ```
-Condition: varLockAcquired = true AND varLockItemId > 0
+Condition: varLockAcquired = true AND varLockItemId > 0 AND varLockBelongsToThisRun = true
 
-If varFlowSuccess = true:
-    Update NumberLocks item Status = Released
-    (Optionally delete the item for housekeeping)
+  Sub-condition: varFlowSuccess = true OR varOutputCode = "OK_SYNC_PENDING"
+    — Data was written (at minimum Svi predmeti has the number). Lock purpose is fulfilled.
+    Update NumberLocks (varLockItemId): Status = Released
+    Optionally delete the lock item for list hygiene.
 
-If varFlowSuccess = false AND varOutputCode is not LOCK_BUSY:
-    Update NumberLocks item Status = Failed
-    (Item remains for recovery audit)
+  Sub-condition: varFlowSuccess = false AND varRequiresRecovery = false
+    — Flow returned a business rejection (LOCK_BUSY, BLOCKED, NEXT_NUMBER_IS_RESERVED,
+      RESERVED_NOT_FOUND, COUNTER_OUT_OF_SYNC, LOCK_EXPIRED).
+      No data was written; nothing to recover.
+    Update NumberLocks (varLockItemId): Status = Released
+    Optionally delete for list hygiene.
 
-If varOutputCode = LOCK_BUSY:
-    Do NOT update the lock item (it belongs to another flow run)
+  — If varLockBelongsToThisRun = false: the lock was already updated to Failed in the failure
+    handler that set it. Do NOT update it again; leave it as Failed for the recovery audit.
 ```
+
+**Summary of lock state outcomes:**
+
+| Scenario | varLockBelongsToThisRun | varFlowSuccess | varRequiresRecovery | Lock final Status |
+|---|---|---|---|---|
+| Success (OK) | true | true | false | Released |
+| OK_SYNC_PENDING | true | false | true | Released (Svi predmeti has number) |
+| Business rejection (no data written) | true | false | false | Released |
+| ASSIGN_FAILED / DUPLICATE_DETECTED / INTERNAL_ERROR | false | false | true | Failed (set by failure handler) |
+| LOCK_BUSY (never acquired our lock) | false | false | false | Not touched |
 
 ---
 
 ### RESPOND TO CALLER
 
+This action must always execute, regardless of the path taken through the flow. It is placed after the Finally scope at the top level of the flow.
+
 ```
 Respond to a PowerApp or Flow:
-    success:         varFlowSuccess
-    code:            varOutputCode
-    message:         varOutputMessage
-    assignedNumber:  varAssignedNumber
-    technicalDetail: varTechnicalDetail
+    success:               varFlowSuccess
+    code:                  varOutputCode
+    message:               varOutputMessage
+    itemId:                inputs.sviPredmetiItemId
+    documentId:            inputs.dokumentaItemId
+    delovodniBrojNumber:   varNextNumber
+    delovodniBrojText:     varDelovodniBrojText
+    registryYear:          inputs.activeYear
+    technicalStatus:       [read from Svi predmeti if needed, or derive from varOutputCode]
+    requiresRecovery:      varRequiresRecovery
+    blockNewRegistrations: varBlockNewRegistrations
+    technicalDetail:       varTechnicalDetail
 ```
 
 ---
 
 ## AuditLog entries — field mapping
 
-All AuditLog writes use the SharePoint list `AuditLog`. Write via the service account connection.
-
-| EventType | Severity | Title | RelatedItemId | UserMessage | TechnicalDetails |
-|---|---|---|---|---|---|
-| `NumberAssigned` | Info | `"Delovodni broj {N} dodeljen"` | sviPredmetiItemId | Success message | Includes assignedNumber, registryBookKey, year |
-| `NumberAssignmentFailed` | Critical | `"Dodela broja nije uspela"` | sviPredmetiItemId | User-friendly block message | Full error, step that failed, varNextNumber |
-| `NumberAssignmentBlocked` | Warning | `"Dodela blokirana - oporavak potreban"` | — | Blocked message for display | FailedNeedsRecovery item IDs found |
-| `LockCollisionDetected` | Warning | `"Lock kolizija - {LockKey}"` | sviPredmetiItemId | Retry message | varLockKey, competing FlowRunId if available |
-| `LockExpiredDetected` | Warning | `"Istekli lock pronađen - {LockKey}"` | sviPredmetiItemId | Recovery required message | LockKey, ExpiresAt, RelatedItemId of expired lock |
-| `ReservedNumberUsed` | Info | `"Iskorišćen rezervisani broj {N}"` | sviPredmetiItemId | — | reservedNumber, reservedNumberItemId |
-| `ReservedNumberDeletionFailed` | Warning | `"Brisanje rezervisanog broja {N} nije uspelo"` | sviPredmetiItemId | Recovery message | reservedNumberItemId, error detail |
-| `MetadataSyncFailed` | Warning | `"Sinhronizacija sa Dokumenta nije uspela"` | sviPredmetiItemId | Recovery message | dokumentaItemId, error detail |
-| `AppConfigUpdateFailed` | Warning | `"AppConfig counter nije ažuriran"` | — | — | registryBookKey, varNextNumber, error detail |
-
----
-
-## Retry policy
-
-- All SharePoint create/update actions: **Retry policy = Fixed interval, Count = 3, Interval = PT5S**
-- Do not retry the lock creation on duplicate key conflict — that is expected behavior, not a transient error. Configure: **Retry policy = None** on the lock Create item action, handle conflict in the failure branch.
+| EventType | Severity | When triggered | TechnicalDetails must include |
+|---|---|---|---|
+| `NumberAssigned` | Info | Step 13 — successful assignment | assignedNumber, delovodniBrojText, registryBookKey, year, useReservedNumber |
+| `NumberAssignmentFailed` | Critical | Steps 5, 8 failure handler, Catch scope | Step where failure occurred, varNextNumber, error message |
+| `NumberAssignmentBlocked` | Warning | Step 2 — blocking item found | Blocking item ID, TechnicalStatus value |
+| `NextNumberReserved` | Warning | Step 6 Branch A — next number is reserved | varNextNumber, Rezervisani brojevi item ID |
+| `CounterOutOfSync` | Warning | Step 4 — Condition A | varConfigCounter, varMaxAssigned, registryBookKey, year |
+| `LockCollisionDetected` | Warning | Step 1 failure handler, Step 1b | varLockKey, competing FlowRunId if available |
+| `LockExpiredDetected` | Warning | Step 1c | Expired lock ID, ExpiresAt, RelatedItemId |
+| `ReservedNumberUsed` | Info | Step 11 — delete success | reservedNumber, reservedNumberItemId |
+| `ReservedNumberDeletionFailed` | Warning | Step 11 — delete failure | reservedNumberItemId, error message |
+| `MetadataSyncFailed` | Warning | Step 9 — Dokumenta update failure | dokumentaItemId, error message |
+| `AppConfigUpdateFailed` | Warning | Step 10 — AppConfig update failure | registryBookKey, varNextNumber, error message |
 
 ---
 
-## Timeout policy
+## Retry policy summary
 
-- Flow timeout: default (90 days for child flows, but this flow should complete in under 30 seconds)
-- Lock duration is 5 minutes, which is the practical timeout for the operation
+| Action | Retry policy | Reason |
+|---|---|---|
+| Create lock item (Step 1) | **None** | Duplicate key conflict is expected; retrying would delay queuing behind other lock |
+| All other SharePoint updates | **Fixed, Count=3, Interval=PT5S** | Transient SharePoint throttling |
+| AuditLog writes | **Fixed, Count=2, Interval=PT3S** | Best-effort; do not let AuditLog failure block the main flow |
 
 ---
 
 ## Parallel execution note
 
-This flow does not use parallel branches for write operations. All SharePoint write actions run sequentially to ensure the transaction order is preserved. Concurrent reads (e.g., reading AppConfig and Svi predmeti max in parallel) may be done using Parallel branch but only for read-only actions before the lock write is complete.
+No SharePoint write actions run in parallel. Sequential order must be maintained to ensure transaction consistency. Read-only actions at step 3 and step 4 may run in a Parallel branch to save time, but only if both reads complete before any write action begins.
 
 ---
 
 ## Dependencies — must be confirmed before implementation
 
-| Dependency | Status |
+| Dependency | Required before |
 |---|---|
-| `NumberLocks` list created with all columns | Confirm with developer |
-| `LockKey` unique constraint on `NumberLocks` | Confirm with developer |
-| `TechnicalStatus` column on `Svi predmeti` | Confirm with developer |
-| `DelovodniBroj` unique + indexed on `Svi predmeti` | Confirm with developer |
-| `DelovodniBroj` column on `Dokumenta` | Confirm with developer |
-| All environment variables pointing to correct lists | Confirm with developer |
-| Service account connection reference confirmed | Confirm with developer |
-| Internal column names for all lists returned to Claude | Required before implementing OData filters |
+| `NumberLocks` list with all columns and `LockKey` unique constraint | Step 1 |
+| `TechnicalStatus` column (Choice) on `Svi predmeti` with all values | Steps 2, 7, 8, 12 |
+| `DelovodniBrojNumber` (Number), `DelovodniBrojText` (Text), `DelovodniBrojGodina` (Number), `DelovodnaKnjigaKey` (Text) on `Svi predmeti` | Step 8 |
+| Same four columns on `Dokumenta` | Step 9 |
+| `DelovodniBrojText` unique constraint on `Svi predmeti` | Step 8 |
+| `DelovodniBrojNumber` index on `Svi predmeti` | Step 5 OData filter performance |
+| `EV_DocCentralV3_lstNumberLocks` environment variable | Step 1 |
+| Internal column names returned for all lists | All OData filters |
+| AppConfig `DelovodneKnjige` schema includes `Key`, `IsActive`, `ActiveYear`, `CurrentCounter` fields | Step 3 |
 
 ---
 
@@ -568,38 +811,111 @@ This flow does not use parallel branches for write operations. All SharePoint wr
 
 ```
 Flow exact name as created:
-Flow trigger type:
-sviPredmetiItemId parameter internal name:
-dokumentaItemId parameter internal name:
-registryBookKey parameter internal name:
-activeYear parameter internal name:
-useReservedNumber parameter internal name:
-reservedNumber parameter internal name:
-reservedNumberItemId parameter internal name:
-requestedByEmail parameter internal name:
-Output: success field name:
-Output: code field name:
-Output: message field name:
-Output: assignedNumber field name:
-Output: technicalDetail field name:
+Flow solution name:
+Input parameter internal names (as configured in trigger):
+  sviPredmetiItemId:
+  dokumentaItemId:
+  registryBookKey:
+  activeYear:
+  useReservedNumber:
+  reservedNumber:
+  reservedNumberItemId:
+  requestedByEmail:
+Output field internal names:
+  success:
+  code:
+  message:
+  itemId:
+  documentId:
+  delovodniBrojNumber:
+  delovodniBrojText:
+  registryYear:
+  technicalStatus:
+  requiresRecovery:
+  blockNewRegistrations:
+  technicalDetail:
+EV_DocCentralV3_lstNumberLocks variable name confirmed:
+Internal column names — Svi predmeti:
+  TechnicalStatus:
+  DelovodniBrojNumber:
+  DelovodniBrojText:
+  DelovodniBrojGodina:
+  DelovodnaKnjigaKey:
+Internal column names — Dokumenta:
+  DelovodniBrojNumber:
+  DelovodniBrojText:
+  DelovodniBrojGodina:
+  DelovodnaKnjigaKey:
 Confirmed tested in isolation (not via CreateDocumentTransaction): yes/no
-Test results for NL-001, NL-010, NL-030:
+Test results for: NL-001, NL-002, NL-010, NL-011, NL-020, NL-030, NL-040, NL-050, NL-060, NL-070
 ```
 
 ---
 
 ## Test scenarios
 
-This flow must be tested independently before wiring into `CF_DocCentral_CreateDocumentTransaction`.
+All tests must be run against this flow in isolation before it is wired into `CF_DocCentral_CreateDocumentTransaction`.
+
+### Normal path
 
 | ID | Scenario | Setup | Expected output |
 |---|---|---|---|
-| NL-001 | Normal assignment | Clean state, no locks, no FailedNeedsRecovery | code=OK, number assigned, TechnicalStatus=Completed |
-| NL-002 | Reserved number | Reserved entry in Rezervisani brojevi, useReservedNumber=true | code=OK, reserved number used, entry deleted |
-| NL-010 | Lock collision | Manually create Active lock for same LockKey before running flow | code=LOCK_BUSY, no number assigned, no FailedNeedsRecovery |
-| NL-011 | 10 concurrent runs | Trigger 10 instances simultaneously | 10 sequential unique numbers; 9 LOCK_BUSY responses retried until success or Canvas handled |
-| NL-020 | Expired lock | Manually create Active lock with ExpiresAt in the past | code=LOCK_EXPIRED, no number assigned |
-| NL-030 | FailedNeedsRecovery blocks | Set TechnicalStatus=FailedNeedsRecovery on one Svi predmeti item | code=BLOCKED_RECOVERY_REQUIRED |
-| NL-050 | Duplicate detection | Manually insert a Svi predmeti item with DelovodniBroj=N; run flow expecting N | code=DUPLICATE_DETECTED, FailedNeedsRecovery set, AuditLog Critical |
-| NL-051 | Reserved not found | useReservedNumber=true, reservedNumber=99, no entry in Rezervisani brojevi | code=RESERVED_NOT_FOUND |
-| NL-052 | SharePoint unique constraint fires | Set up scenario where duplicate write reaches SharePoint | Flow Catch handles 409, FailedNeedsRecovery set |
+| NL-001 | Normal assignment | Clean state; AppConfig counter=5; max in Svi predmeti=5; no locks; no blocking items | code=OK, delovodniBrojNumber=6, delovodniBrojText="DK01-6/2026", TechnicalStatus=Completed on both lists |
+| NL-002 | Reserved number assignment | useReservedNumber=true; reservedNumber=3; entry in Rezervisani brojevi | code=OK, delovodniBrojNumber=3, reserved entry deleted from list |
+| NL-003 | Counter ahead of Svi predmeti | Counter=10, max in Svi predmeti=8 | code=OK, delovodniBrojNumber=11, no error (expected gap) |
+
+### Counter integrity
+
+| ID | Scenario | Setup | Expected output |
+|---|---|---|---|
+| NL-040 | Counter out of sync — Svi predmeti ahead | Counter=5, max in Svi predmeti=7 | code=COUNTER_OUT_OF_SYNC, blockNewRegistrations=true, AuditLog CounterOutOfSync Warning, no number assigned |
+| NL-041 | Counter out of sync — after recovery | Admin corrects counter to 7; rerun | code=OK, delovodniBrojNumber=8 |
+
+### Next number is reserved
+
+| ID | Scenario | Setup | Expected output |
+|---|---|---|---|
+| NL-050 | Next sequential number is reserved, useReservedNumber=false | Counter=5; number 6 exists in Rezervisani brojevi | code=NEXT_NUMBER_IS_RESERVED, blockNewRegistrations=false, no number assigned, AuditLog Warning |
+| NL-051 | Operator switches to reserved path | Same setup; re-call with useReservedNumber=true, reservedNumber=6 | code=OK, delovodniBrojNumber=6, reserved entry deleted |
+| NL-052 | Operator cancels reservation externally; retries | Reservation deleted; re-call with useReservedNumber=false | code=OK, delovodniBrojNumber=6 |
+
+### Metadata sync failure blocks next assignment
+
+| ID | Scenario | Setup | Expected output |
+|---|---|---|---|
+| NL-060 | Dokumenta sync fails | Step 9 fails (simulate by breaking Dokumenta item ID) | code=OK_SYNC_PENDING, requiresRecovery=true, blockNewRegistrations=true, TechnicalStatus=MetadataSyncFailed on Svi predmeti |
+| NL-061 | New assignment attempted while MetadataSyncFailed exists | Item from NL-060 still in MetadataSyncFailed | code=BLOCKED_RECOVERY_REQUIRED, new number NOT assigned |
+| NL-062 | Admin fixes MetadataSyncFailed via recovery flow | TechnicalStatus updated to Completed | Next assignment attempt: code=OK |
+
+### Locking
+
+| ID | Scenario | Setup | Expected output |
+|---|---|---|---|
+| NL-010 | Lock collision | Manually create Active lock for same LockKey with future ExpiresAt before running flow | code=LOCK_BUSY, requiresRecovery=false, blockNewRegistrations=false, AuditLog LockCollisionDetected |
+| NL-011 | 10 concurrent runs | Trigger 10 instances simultaneously against the same registry book | Exactly 10 unique sequential numbers assigned with no duplicates and no skips; remaining runs return LOCK_BUSY and are retried by caller |
+| NL-012 | Concurrent runs on different registry books | Trigger 5 instances on DK01 and 5 on DK02 simultaneously | DK01 and DK02 each get 5 sequential unique numbers; no cross-book blocking |
+| NL-020 | Expired lock detected | Manually create Active lock with ExpiresAt in the past; use different FlowRunId | code=LOCK_EXPIRED, blockNewRegistrations=true, AuditLog LockExpiredDetected |
+
+### Blocking
+
+| ID | Scenario | Setup | Expected output |
+|---|---|---|---|
+| NL-030 | FailedNeedsRecovery blocks | Set TechnicalStatus=FailedNeedsRecovery on any Svi predmeti item | code=BLOCKED_RECOVERY_REQUIRED, blockNewRegistrations=true |
+| NL-031 | MetadataSyncFailed blocks | Set TechnicalStatus=MetadataSyncFailed on any Svi predmeti item | code=BLOCKED_RECOVERY_REQUIRED, blockNewRegistrations=true |
+| NL-032 | Both blocking states resolved | Admin sets both items to Completed | Next run: code=OK |
+
+### Duplicate and uniqueness safeguards
+
+| ID | Scenario | Setup | Expected output |
+|---|---|---|---|
+| NL-070 | Duplicate detection at flow level | Manually insert Svi predmeti item with DelovodniBrojNumber=varNextNumber | code=DUPLICATE_DETECTED, requiresRecovery=true, TechnicalStatus=FailedNeedsRecovery set, AuditLog Critical |
+| NL-071 | Reserved not found | useReservedNumber=true, reservedNumber=99; no entry in Rezervisani brojevi | code=RESERVED_NOT_FOUND, no data written |
+| NL-072 | SharePoint unique constraint fires at write | DelovodniBrojText unique constraint rejects the write | Caught by step 8 failure handler; code=ASSIGN_FAILED, FailedNeedsRecovery set |
+
+### Output schema validation
+
+| ID | Scenario | Expected behavior |
+|---|---|---|
+| NL-080 | All success fields populated | response.itemId = inputs.sviPredmetiItemId; response.documentId = inputs.dokumentaItemId; all fields present |
+| NL-081 | Business rejection — no Terminate used | Caller receives a fully populated response object with success=false and specific code; no unhandled flow error thrown |
+| NL-082 | Catch scope fires | Caller receives response with code=INTERNAL_ERROR; flow does not hang or return empty response |
