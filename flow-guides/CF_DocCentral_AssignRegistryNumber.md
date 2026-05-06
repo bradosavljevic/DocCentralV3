@@ -1,6 +1,6 @@
 # Flow Guide: CF_DocCentral_AssignRegistryNumber
 
-Last updated: 2026-05-06 (final pre-implementation revision)
+Last updated: 2026-05-06 (revision 4)
 
 ---
 
@@ -14,7 +14,7 @@ This flow is a **child flow** called by `CF_DocCentral_CreateDocumentTransaction
 
 ## Design principles
 
-1. **Counter is authoritative.** The next number is always `CurrentCounter + 1`. If `Svi predmeti` max disagrees with the counter in any direction that cannot be explained, the flow stops and returns `COUNTER_OUT_OF_SYNC` or `COUNTER_AHEAD_NEEDS_REVIEW`.
+1. **Counter is authoritative for sequential assignment.** The next sequential number is always `CurrentCounter + 1`. If `Svi predmeti` max disagrees with the counter in any direction that cannot be explained, the flow stops and returns `COUNTER_OUT_OF_SYNC` or `COUNTER_AHEAD_NEEDS_REVIEW`. Reserved number assignment uses a specific pre-chosen number but must never lower the counter below its current value.
 
 2. **No skipping under any circumstances.** If the next sequential number is reserved and `useReservedNumber = false`, the flow returns `NEXT_NUMBER_IS_RESERVED` and blocks automatic assignment. It never increments past a reserved number to find the next free one.
 
@@ -160,14 +160,16 @@ All values used by this flow:
 | `OK` | **true** | true | false | false | Number assigned; both lists updated; all cleanup complete |
 | `SYNC_PENDING_RECOVERY_REQUIRED` | **false** | **true** | **true** | **true** | Number written to Svi predmeti; Dokumenta sync failed; recovery required; new registrations blocked |
 | `COUNTER_SYNC_FAILED` | **false** | **true** | **true** | **true** | Number written to Svi predmeti; AppConfig counter update failed; next run cannot safely determine next number without repair |
-| `LOCK_BUSY` | false | false | false | false | Another flow holds the lock; no data written; caller may retry |
-| `LOCK_EXPIRED` | false | false | false | **true** | Expired lock from a previous run detected; transaction state unknown; admin must validate |
+| `LOCK_BUSY` | false | false | false | false | Another flow validly holds the lock; no data written; caller may retry |
+| `LOCK_EXPIRED` | false | false | false | **true** | Expired active lock detected (at Step 1 query or Step 1c); transaction state unknown; admin must validate |
+| `LOCK_CREATE_FAILED` | false | false | false | false | Lock create failed with no competing lock present; likely transient infrastructure error; caller may retry |
 | `BLOCKED_RECOVERY_REQUIRED` | false | false | false | **true** | FailedNeedsRecovery, MetadataSyncFailed, or CounterSyncFailed item exists; admin must resolve |
 | `NEXT_NUMBER_IS_RESERVED` | false | false | false | **true** | Next sequential number is reserved; automatic assignment is blocked; operator must use reserved path or cancel the reservation |
 | `COUNTER_OUT_OF_SYNC` | false | false | false | **true** | Svi predmeti max > AppConfig counter; counter is behind actual assignments; recovery required |
 | `COUNTER_AHEAD_NEEDS_REVIEW` | false | false | false | **true** | AppConfig counter > Svi predmeti max by more than expected; possible skipped numbers; admin must verify |
 | `DUPLICATE_DETECTED` | false | false | **true** | **true** | Candidate number already exists in Svi predmeti; critical data integrity issue; FailedNeedsRecovery set |
 | `RESERVED_NOT_FOUND` | false | false | false | false | Reserved number not in Rezervisani brojevi; no data written |
+| `RESERVED_ALREADY_USED` | false | false | false | false | Reserved number item exists but `UsageStatus=Used`; number already assigned in a previous run; deletion pending cleanup |
 | `ASSIGN_FAILED` | false | false | **true** | **true** | Write to Svi predmeti failed; FailedNeedsRecovery set |
 | `INTERNAL_ERROR` | false | false | **true** | **true** | Unhandled exception; FailedNeedsRecovery set if data was partially written |
 
@@ -199,6 +201,7 @@ varRequiresRecovery           (Boolean)  false
 varBlockNewRegistrations      (Boolean)  false
 varConfigCounter              (Integer)  0
 varMaxAssigned                (Integer)  0
+varCounterNewValue            (Integer)  0
 varAppConfigItemId            (Integer)  0
 varAppConfigJson              (String)   ""
 ```
@@ -229,7 +232,7 @@ RelatedItemId:     inputs.sviPredmetiItemId
 RelatedDocumentId: inputs.dokumentaItemId
 ```
 
-**Retry policy: None.** A duplicate key conflict (HTTP 400) is an expected business condition, not a transient error.
+**Retry policy: None.** A duplicate key conflict (HTTP 400) is an expected business condition, not a transient error. Retrying on conflict would not help and would delay the caller.
 
 After the action, branch on success vs failure:
 
@@ -241,17 +244,48 @@ Set varLockBelongsToThisRun = true
 → Continue to Step 1b
 ```
 
-**On failure (any error — conflict or otherwise):**
+**On failure — classify the error before setting the output code:**
+
+A failed lock creation does not automatically mean another flow holds the lock. The error may be a network failure, SharePoint throttling, a missing list, or a permission error — none of which mean "LOCK_BUSY." Query `NumberLocks` to determine the true cause.
+
 ```
-Set varOutputCode = "LOCK_BUSY"
-Set varOutputMessage = "Sistem je trenutno zauzet dodavanjem delovodnog broja. Pokušajte ponovo za nekoliko sekundi."
-Set varTechnicalDetail = concat("Lock create failed on key: ", varLockKey,
-                                " | Error: ", actions('Create_NumberLock')?['error']?['message'])
-Write AuditLog: LockCollisionDetected, Warning
-→ Fall through to Finally (varLockBelongsToThisRun = false; no lock to release)
+Action: SharePoint — Get items from NumberLocks
+    Filter: LockKey eq varLockKey and Status eq Active
+    Top:    1
+    Select: ID, ExpiresAt, FlowRunId
+
+Case A: active lock found AND ExpiresAt > utcNow() (not expired)
+    → Another flow validly holds the lock
+    Set varOutputCode = "LOCK_BUSY"
+    Set varOutputMessage = "Sistem je trenutno zauzet dodavanjem delovodnog broja. Pokušajte ponovo za nekoliko sekundi."
+    Set varTechnicalDetail = concat("Active lock held by FlowRunId: ",
+                                    first(body(...))?['FlowRunId'],
+                                    " | ExpiresAt: ", first(body(...))?['ExpiresAt'])
+    — Do NOT write AuditLog for a normal lock collision (see AuditLog noise note below)
+    → Fall through to Finally (varLockBelongsToThisRun = false; no lock to release)
+
+Case B: active lock found AND ExpiresAt < utcNow() (expired)
+    → A previous run's lock is still present but has expired
+    Set varOutputCode = "LOCK_EXPIRED"
+    Set varOutputMessage = "Prethodna operacija nije završena. Administrator mora proveriti stanje registracije pre nastavka."
+    Set varBlockNewRegistrations = true
+    Set varTechnicalDetail = concat("Expired lock ID: ", first(body(...))?['ID'],
+                                    " | ExpiresAt: ", first(body(...))?['ExpiresAt'])
+    Write AuditLog: LockExpiredDetected, Warning
+    → Fall through to Finally
+
+Case C: no active lock found
+    → Create failed for a reason unrelated to locking (throttling, permission, list not found)
+    Set varOutputCode = "LOCK_CREATE_FAILED"
+    Set varOutputMessage = "Nije moguće pokrenuti dodelu delovodnog broja. Kontaktirajte administratora."
+    Set varBlockNewRegistrations = false
+    Set varTechnicalDetail = concat("Lock create failed, no competing lock found | Key: ", varLockKey,
+                                    " | Error: ", actions('Create_NumberLock')?['error']?['message'])
+    Write AuditLog: LockCreateFailed, Warning
+    → Fall through to Finally
 ```
 
-Implementation note: wrap all subsequent steps inside a condition block gated on `varLockBelongsToThisRun eq true`. This replaces `Terminate` and ensures the Respond action always executes.
+Implementation note: wrap all steps from Step 1b onward inside a condition block gated on `varLockBelongsToThisRun eq true`. This ensures the Respond action always executes regardless of which branch was taken.
 
 ---
 
@@ -408,41 +442,55 @@ System is consistent. `varNextNumber = varConfigCounter + 1`. Continue.
 
 **Condition C — Counter ahead of Svi predmeti (`varMaxAssigned lt varConfigCounter`)**
 
-AppConfig counter is higher than the highest number found in `Svi predmeti`. This may indicate:
-- A previous transaction incremented the counter but the Svi predmeti write failed → gap in sequence → `FailedNeedsRecovery` should already be blocking (caught at step 2)
-- Counter was manually set incorrectly
-- Items were deleted from Svi predmeti without counter correction
+AppConfig counter is higher than the highest number found in `Svi predmeti`. All known causes of this state represent a potential gap in the number sequence:
+- A previous transaction incremented the counter but the `Svi predmeti` write failed → the failed item's `TechnicalStatus` should be blocking (step 2), but if it somehow was not caught there, this check is the fallback
+- Counter was manually set to a higher value
+- Items were deleted from `Svi predmeti` without correcting the counter
 
-This is not automatically safe. Block and require admin review unless the gap is exactly 1 (which can happen during step 10 lag in normal operation).
+There is no gap size that is safe to ignore without explicit human confirmation. A gap of 1 looks benign but could indicate one skipped number. The only safe resolution is admin review that confirms all numbers between `varMaxAssigned` and `varConfigCounter` are either validly reserved in `Rezervisani brojevi` or have been accounted for.
 
 ```
-If (varConfigCounter - varMaxAssigned) > 1:
-    Set varOutputCode = "COUNTER_AHEAD_NEEDS_REVIEW"
-    Set varOutputMessage = "Brojač delovodnih brojeva je ispred stvarnih zapisa. Administrator mora proveriti da li postoje preskočeni brojevi."
-    Set varBlockNewRegistrations = true
-    Set varTechnicalDetail = concat("AppConfig counter=", varConfigCounter,
-                                    " | Svi predmeti max=", varMaxAssigned,
-                                    " | Gap=", sub(varConfigCounter, varMaxAssigned),
-                                    " | Book=", inputs.registryBookKey,
-                                    " | Year=", inputs.activeYear)
-    Write AuditLog: CounterAheadNeedsReview, Warning
-    → Exit condition block (our lock released in Finally; no data written)
-
-If (varConfigCounter - varMaxAssigned) eq 1:
-    — Gap of exactly 1 is within normal tolerance during high-concurrency or after
-    — a counter update that preceded the Svi predmeti write in a previous run.
-    — Continue with varNextNumber = varConfigCounter + 1.
-    Write AuditLog: CounterGapOfOne, Info (for diagnostics)
+Set varOutputCode = "COUNTER_AHEAD_NEEDS_REVIEW"
+Set varOutputMessage = "Brojač delovodnih brojeva je ispred stvarnih zapisa u Svi predmeti. Administrator mora proveriti da li postoje preskočeni ili nezavedeni brojevi pre nastavka."
+Set varBlockNewRegistrations = true
+Set varTechnicalDetail = concat("AppConfig counter=", varConfigCounter,
+                                " | Svi predmeti max=", varMaxAssigned,
+                                " | Gap=", sub(varConfigCounter, varMaxAssigned),
+                                " | Book=", inputs.registryBookKey,
+                                " | Year=", inputs.activeYear)
+Write AuditLog: CounterAheadNeedsReview, Warning
+→ Exit condition block (our lock released in Finally; no data written)
 ```
+
+> **Recovery path for Condition C:** Admin must inspect `Svi predmeti` to confirm what numbers exist between `varMaxAssigned + 1` and `varConfigCounter`. If all are validly reserved numbers in `Rezervisani brojevi`, the counter is correct and the admin manually resets `TechnicalStatus` or triggers a counter validation flow. If any number in that range is unaccounted for, it must be treated as a potential sequence gap and investigated.
 
 **Reserved number path override**
 
-Applied after all integrity checks, and only if `inputs.useReservedNumber eq true`:
+Applied after all integrity checks pass (Conditions A, B, C above), and only if `inputs.useReservedNumber eq true`.
 
 ```
 Set varNextNumber = inputs.reservedNumber
-— Reserved number bypasses counter calculation; do not re-run integrity checks for the reserved number itself.
-— The reserved number may be lower than the counter (it was reserved in the past).
+```
+
+The reserved number is used as-is for the write to `Svi predmeti` and `Dokumenta`. However, the AppConfig `CurrentCounter` must be updated to `max(varConfigCounter, inputs.reservedNumber)` in step 10, not to `inputs.reservedNumber` directly.
+
+**Why reserved numbers must not lower the counter:**
+
+When a number is reserved, it is excluded from the normal sequential pool at the time of reservation. The counter already advanced past it. For example: if the counter is at 12 and a document is registered using reserved number 8, the counter must remain at 12 (or advance to 13 for a sequential registration, whichever comes next). Setting the counter to 8 would cause the next sequential registration to assign 9, which was already assigned and is therefore a duplicate.
+
+```
+varCounterNewValue = max(varConfigCounter, inputs.reservedNumber)
+— Use this value in step 10 instead of varNextNumber when useReservedNumber = true.
+```
+
+Add variable: `varCounterNewValue (Integer, 0)` to the initialization block.
+
+Set after reserved path override:
+```
+If inputs.useReservedNumber = true:
+    Set varCounterNewValue = max(varConfigCounter, inputs.reservedNumber)
+Else:
+    Set varCounterNewValue = varNextNumber
 ```
 
 ---
@@ -485,13 +533,16 @@ Action: SharePoint — Get items from `Rezervisani brojevi`
 
 ```
 Filter: RezervisaniBroj eq varNextNumber
+        AND DelovodnaKnjigaKey eq inputs.registryBookKey
+        AND Godina eq inputs.activeYear
+        AND UsageStatus eq 'Pending'
 Top:    1
 Select: ID, RezervisaniBroj
 ```
 
 Condition: `length(body('Get_reserved_check')?['value']) > 0`
 
-If reserved entry found:
+If reserved entry found (UsageStatus=Pending):
 ```
 Set varOutputCode = "NEXT_NUMBER_IS_RESERVED"
 Set varOutputMessage = concat("Sledeći redni broj (", varNextNumber, ") je rezervisan. ",
@@ -512,11 +563,13 @@ Action: SharePoint — Get items from `Rezervisani brojevi`
 
 ```
 Filter: RezervisaniBroj eq inputs.reservedNumber
+        AND DelovodnaKnjigaKey eq inputs.registryBookKey
+        AND Godina eq inputs.activeYear
 Top:    1
-Select: ID, RezervisaniBroj
+Select: ID, RezervisaniBroj, UsageStatus, UsedByItemId
 ```
 
-Condition: `length(body('Get_reserved_verify')?['value']) eq 0`
+Condition A: `length(body('Get_reserved_verify')?['value']) eq 0`
 
 If not found:
 ```
@@ -524,6 +577,24 @@ Set varOutputCode = "RESERVED_NOT_FOUND"
 Set varOutputMessage = "Rezervisani broj nije pronađen. Možda je već iskorišćen ili je broj pogrešan."
 → Exit condition block (our lock released in Finally; no data written)
 ```
+
+Condition B: item found AND `UsageStatus eq 'Used'`
+
+This means sub-step 11a succeeded but 11b (delete) failed in a previous run, OR the number was used but not deleted. Either way the number is already assigned.
+
+```
+Set varOutputCode = "RESERVED_ALREADY_USED"
+Set varOutputMessage = concat("Rezervisani broj ", inputs.reservedNumber, " je već iskorišćen. Kontaktirajte administratora.")
+Set varTechnicalDetail = concat("Reserved item ID: ", first(body(...))?['ID'],
+                                " | UsageStatus: Used",
+                                " | UsedByItemId: ", first(body(...))?['UsedByItemId'])
+Write AuditLog: ReservedNumberAlreadyUsed, Warning
+→ Exit condition block (our lock released in Finally; no data written)
+```
+
+Add `RESERVED_ALREADY_USED` to the output code table:
+- `success=false`, `numberAssigned=false`, `requiresRecovery=false`, `blockNewRegistrations=false`
+- Meaning: reserved number item exists but is already marked Used; caller must not proceed
 
 ---
 
@@ -632,13 +703,19 @@ Write AuditLog: MetadataSyncFailed, Warning
 
 This step runs only when `varNumberAssigned = true`.
 
-Reconstruct the AppConfig `Config` JSON: replace `CurrentCounter` for the matching registry book entry with `varNextNumber`. All other entries must remain unchanged.
+Reconstruct the AppConfig `Config` JSON: replace `CurrentCounter` for the matching registry book entry with `varCounterNewValue`. All other entries must remain unchanged.
+
+`varCounterNewValue` is:
+- For sequential path (`useReservedNumber = false`): equal to `varNextNumber`
+- For reserved path (`useReservedNumber = true`): equal to `max(varConfigCounter, inputs.reservedNumber)`
+
+This ensures that assigning a reserved number that is lower than the current counter does not regress the counter and risk producing duplicates in subsequent sequential assignments.
 
 Action: SharePoint — Update item in `AppConfig`
 
 ```
 Item ID: varAppConfigItemId
-Config:  [reconstructed JSON string]
+Config:  [reconstructed JSON string with CurrentCounter = varCounterNewValue]
 ```
 
 Retry policy: Fixed, Count = 3, Interval = PT5S.
@@ -658,6 +735,7 @@ Set varBlockNewRegistrations = true
 Set varTechnicalDetail = concat(varTechnicalDetail,
                                 " | Step 10 AppConfig counter update failed: ", error message,
                                 " | AssignedNumber=", varNextNumber,
+                                " | NewCounterValue=", varCounterNewValue,
                                 " | Book=", inputs.registryBookKey,
                                 " | Year=", inputs.activeYear)
 Update Svi predmeti (inputs.sviPredmetiItemId): TechnicalStatus = CounterSyncFailed
@@ -672,14 +750,48 @@ The reason this blocks: if the counter is not updated, the next flow run will re
 
 ---
 
-**Step 11 — Delete used reserved number (reserved path only)**
+**Step 11 — Mark reserved number as used and attempt deletion**
 
 This step runs only when:
 - `inputs.useReservedNumber = true`
 - `varSyncSuccess = true`
 - `varCounterUpdateSuccess = true`
 
-> Only delete after both Svi predmeti and Dokumenta are confirmed written and the counter is updated. Premature deletion when sync or counter failed would leave the sequence in an ambiguous state.
+> Only proceed after both `Svi predmeti` and `Dokumenta` are confirmed written and the counter is updated.
+
+**Sub-step 11a — Mark as used before deleting**
+
+Before attempting deletion, update the `Rezervisani brojevi` item with `UsageStatus = Used` and `UsedByItemId = inputs.sviPredmetiItemId`. This is the reuse-prevention guard. If the delete in step 11b then fails, the item remains in the list but is marked `Used`, which prevents any future flow from consuming it again (step 6 Branch B verifies the item exists AND `UsageStatus ne 'Used'`).
+
+Action: SharePoint — Update item in `Rezervisani brojevi`
+
+```
+Item ID:       inputs.reservedNumberItemId
+UsageStatus:   Used
+UsedByItemId:  inputs.sviPredmetiItemId
+UsedAt:        utcNow()
+```
+
+Retry policy: Fixed, Count = 3, Interval = PT5S.
+
+If update fails:
+```
+Write AuditLog: ReservedNumberMarkUsedFailed, Warning,
+    TechnicalDetail = concat("reservedNumberItemId=", inputs.reservedNumberItemId,
+                             " | sviPredmetiItemId=", inputs.sviPredmetiItemId,
+                             " | Error=", error message)
+Update NumberLocks (varLockItemId): ErrorCode = "RESERVED_MARK_FAILED"
+— The item is NOT yet marked Used. Reuse is still possible.
+— Set a blocking state so recovery can fix this before the number can be reused.
+Set varOutputCode = "COUNTER_SYNC_FAILED"   ← reuse COUNTER_SYNC_FAILED to block registrations
+Set varRequiresRecovery = true
+Set varBlockNewRegistrations = true
+Update Svi predmeti (inputs.sviPredmetiItemId): TechnicalStatus = CounterSyncFailed
+— Recovery flow must retry the UsageStatus update before clearing CounterSyncFailed
+→ Skip to Finally (do not attempt delete if mark failed)
+```
+
+**Sub-step 11b — Delete the marked item**
 
 Action: SharePoint — Delete item from `Rezervisani brojevi`
 
@@ -692,16 +804,24 @@ Retry policy: Fixed, Count = 3, Interval = PT5S.
 If delete fails:
 ```
 Write AuditLog: ReservedNumberDeletionFailed, Warning,
-    TechnicalDetail = concat("reservedNumberItemId=", inputs.reservedNumberItemId, " | Error=", error message)
+    TechnicalDetail = concat("reservedNumberItemId=", inputs.reservedNumberItemId,
+                             " | reservedNumber=", inputs.reservedNumber,
+                             " | Error=", error message)
 Update NumberLocks (varLockItemId): ErrorCode = "RESERVED_DELETE_FAILED"
-— do NOT set FailedNeedsRecovery; recovery flow handles REC-003
-— varFlowSuccess remains on track for the success path
+— The item IS already marked UsageStatus=Used (sub-step 11a succeeded).
+— Reuse is prevented even though the item was not deleted.
+— This is a cleanup failure only, not a data integrity risk.
+— do NOT set FailedNeedsRecovery or block registrations.
+— Recovery flow (REC-003) will retry deletion.
+— varFlowSuccess path continues normally.
 ```
 
 If delete succeeds:
 ```
 Write AuditLog: ReservedNumberUsed, Info,
-    TechnicalDetail = concat("reservedNumber=", inputs.reservedNumber, " | itemId=", inputs.reservedNumberItemId)
+    TechnicalDetail = concat("reservedNumber=", inputs.reservedNumber,
+                             " | itemId=", inputs.reservedNumberItemId,
+                             " | sviPredmetiItemId=", inputs.sviPredmetiItemId)
 ```
 
 ---
@@ -866,14 +986,25 @@ Respond to a PowerApp or Flow:
 | `NumberAssignmentBlocked` | Warning | Step 2 | Blocking item ID, blocking TechnicalStatus value |
 | `NextNumberReserved` | Warning | Step 6 Branch A | varNextNumber, Rezervisani brojevi item ID |
 | `CounterOutOfSync` | Warning | Step 4 Condition A | varConfigCounter, varMaxAssigned, registryBookKey, year |
-| `CounterAheadNeedsReview` | Warning | Step 4 Condition C (gap > 1) | varConfigCounter, varMaxAssigned, gap size, registryBookKey, year |
-| `CounterGapOfOne` | Info | Step 4 Condition C (gap = 1) | varConfigCounter, varMaxAssigned, registryBookKey, year |
-| `LockCollisionDetected` | Warning | Step 1 failure, Step 1b | varLockKey, competing FlowRunId if available |
+| `CounterAheadNeedsReview` | Warning | Step 4 Condition C (any gap) | varConfigCounter, varMaxAssigned, gap size, registryBookKey, year |
+| `LockCollisionDetected` | Warning | Step 1b only (multiple Active locks for same key — abnormal); **not** written for normal LOCK_BUSY at Step 1 | varLockKey, count of active locks, competing FlowRunId if available |
+| `LockCreateFailed` | Warning | Step 1 failure — Case C (no competing lock; infrastructure error) | varLockKey, error message from Create action |
 | `LockExpiredDetected` | Warning | Step 1c | Expired lock ID, ExpiresAt, RelatedItemId |
 | `ReservedNumberUsed` | Info | Step 11 delete success | reservedNumber, reservedNumberItemId |
 | `ReservedNumberDeletionFailed` | Warning | Step 11 delete failure | reservedNumberItemId, error message |
 | `MetadataSyncFailed` | Warning | Step 9 failure | dokumentaItemId, error message |
 | `AppConfigUpdateFailed` | Warning | Step 10 failure | registryBookKey, varNextNumber, error message |
+
+### AuditLog noise policy for lock collisions
+
+Under normal concurrent load, `LOCK_BUSY` is expected and frequent. Writing an AuditLog entry for every normal lock collision would fill the AuditLog rapidly and obscure genuine warnings.
+
+Rules:
+- **Do not write AuditLog for Step 1 Case A (normal LOCK_BUSY).** The caller is responsible for retry logic. No log entry needed.
+- **Do write AuditLog for Step 1 Case B (expired lock detected at Step 1).** This is abnormal and requires admin attention.
+- **Do write AuditLog for Step 1 Case C (lock create failed, no competing lock).** This is an infrastructure error.
+- **Do write AuditLog for Step 1b (multiple Active locks for the same key).** This should never happen if the unique constraint is configured correctly; it indicates a constraint misconfiguration.
+- **Do write AuditLog for Step 1c (expired lock detected after lock creation).** Same as Case B; admin must investigate.
 
 ---
 
@@ -976,8 +1107,8 @@ All tests must be run in isolation before wiring into `CF_DocCentral_CreateDocum
 |---|---|---|---|
 | NL-040 | Svi predmeti ahead of counter | Counter=5; max in Svi predmeti=7 | `success=false`, `code=COUNTER_OUT_OF_SYNC`, `numberAssigned=false`, `blockNewRegistrations=true`, AuditLog `CounterOutOfSync` Warning |
 | NL-041 | Counter ahead by gap > 1 | Counter=10; max in Svi predmeti=7 | `success=false`, `code=COUNTER_AHEAD_NEEDS_REVIEW`, `numberAssigned=false`, `blockNewRegistrations=true`, AuditLog `CounterAheadNeedsReview` Warning |
-| NL-042 | Counter ahead by exactly 1 | Counter=6; max in Svi predmeti=5 | `success=true`, `code=OK`, `delovodniBrojNumber=7`, AuditLog `CounterGapOfOne` Info |
-| NL-043 | Counter out of sync — after recovery | Admin corrects counter to 7; rerun | `success=true`, `code=OK`, `delovodniBrojNumber=8` |
+| NL-042 | Counter ahead by exactly 1 | Counter=6; max in Svi predmeti=5 | `success=false`, `code=COUNTER_AHEAD_NEEDS_REVIEW`, `numberAssigned=false`, `blockNewRegistrations=true` — gap of 1 is treated the same as any other gap; admin must confirm the missing number is accounted for |
+| NL-043 | Counter ahead — after admin confirms all gaps are reserved numbers | Admin verifies numbers in gap are all in Rezervisani brojevi or accounted for; manually unblocks | Next run: `success=true`, `code=OK`, `delovodniBrojNumber=counter+1` |
 
 ### Next number is reserved
 
