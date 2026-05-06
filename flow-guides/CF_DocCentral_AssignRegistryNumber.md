@@ -57,6 +57,26 @@ All SharePoint actions must use `CR_DocCentralV3_SharePoint` (service account co
 
 ---
 
+## Required columns — Rezervisani brojevi
+
+The following columns must exist on the `Rezervisani brojevi` list before this flow can be implemented. These are new columns that do not exist in the V2 app. The developer must create them and return the confirmed internal names.
+
+| Display name | Suggested internal name | Type | Required | Unique | Indexed | Notes |
+|---|---|---|---|---|---|---|
+| UsageStatus | UsageStatus | Choice | **Yes** | No | **Yes** | Values: `Pending`, `Used`; default = `Pending`; **must be set — blank/null is treated as invalid** |
+| UsedByItemId | UsedByItemId | Number | No | No | No | ID of the `Svi predmeti` item that consumed this number; written in step 11a |
+| UsedAt | UsedAt | Date and Time | No | No | No | UTC timestamp of use; written in step 11a |
+| DelovodnaKnjigaKey | DelovodnaKnjigaKey | Single line text | **Yes** | No | **Yes** | Registry book key, e.g. `DK01`; required for scoped step 6 queries |
+| Godina | Godina | Number (integer) | **Yes** | No | **Yes** | Year the reservation is valid for; required for scoped step 6 queries and year-closing check |
+
+### UsageStatus is required — no legacy null treatment in V3
+
+`UsageStatus` must be a required field with default value `Pending` on all new rows. The flow does not treat a blank or null `UsageStatus` as implicitly `Pending`. If an item is found in step 6 Branch B with `UsageStatus` blank or null, the flow returns `RESERVED_STATUS_INVALID`. Admin must correct the item before the reserved path can proceed.
+
+Any V2 legacy rows migrated into the V3 list must have `UsageStatus` set to `Pending` as part of the migration. Migration without setting this field is not valid.
+
+---
+
 ## SharePoint column model for DelovodniBroj
 
 Registry numbers are stored in four separate columns on both `Svi predmeti` and `Dokumenta`. A single formatted text column is insufficient for sequence queries, year filtering, and uniqueness enforcement.
@@ -169,6 +189,7 @@ All values used by this flow:
 | `COUNTER_AHEAD_NEEDS_REVIEW` | false | false | false | **true** | AppConfig counter > Svi predmeti max by more than expected; possible skipped numbers; admin must verify |
 | `DUPLICATE_DETECTED` | false | false | **true** | **true** | Candidate number already exists in Svi predmeti; critical data integrity issue; FailedNeedsRecovery set |
 | `RESERVED_NOT_FOUND` | false | false | false | false | Reserved number not in Rezervisani brojevi; no data written |
+| `RESERVED_STATUS_INVALID` | false | false | false | false | Reserved number item exists but `UsageStatus` is blank/null; admin must correct the item before proceeding |
 | `RESERVED_ALREADY_USED` | false | false | false | false | Reserved number item exists but `UsageStatus=Used`; number already assigned in a previous run; deletion pending cleanup |
 | `ASSIGN_FAILED` | false | false | **true** | **true** | Write to Svi predmeti failed; FailedNeedsRecovery set |
 | `INTERNAL_ERROR` | false | false | **true** | **true** | Unhandled exception; FailedNeedsRecovery set if data was partially written |
@@ -578,7 +599,22 @@ Set varOutputMessage = "Rezervisani broj nije pronađen. Možda je već iskoriš
 → Exit condition block (our lock released in Finally; no data written)
 ```
 
-Condition B: item found AND `UsageStatus eq 'Used'`
+Condition B: item found AND `UsageStatus` is blank or null
+
+`UsageStatus` is a required field in V3. A blank or null value means either the item predates V3 and was not migrated correctly, or a data integrity issue occurred during creation. The flow cannot safely determine whether this number has been consumed.
+
+```
+Set varOutputCode = "RESERVED_STATUS_INVALID"
+Set varOutputMessage = concat("Rezervisani broj ", inputs.reservedNumber,
+                               " ima nevažeći status. Kontaktirajte administratora da postavi UsageStatus.")
+Set varTechnicalDetail = concat("Reserved item ID: ", first(body(...))?['ID'],
+                                " | UsageStatus: null/blank",
+                                " | Action required: set UsageStatus to Pending or Used")
+Write AuditLog: ReservedStatusInvalid, Warning
+→ Exit condition block (our lock released in Finally; no data written)
+```
+
+Condition C: item found AND `UsageStatus eq 'Used'`
 
 This means sub-step 11a succeeded but 11b (delete) failed in a previous run, OR the number was used but not deleted. Either way the number is already assigned.
 
@@ -592,9 +628,9 @@ Write AuditLog: ReservedNumberAlreadyUsed, Warning
 → Exit condition block (our lock released in Finally; no data written)
 ```
 
-Add `RESERVED_ALREADY_USED` to the output code table:
-- `success=false`, `numberAssigned=false`, `requiresRecovery=false`, `blockNewRegistrations=false`
-- Meaning: reserved number item exists but is already marked Used; caller must not proceed
+Condition D: item found AND `UsageStatus eq 'Pending'`
+
+Proceed with reserved path assignment.
 
 ---
 
@@ -929,7 +965,8 @@ Condition: varLockAcquired = true AND varLockItemId > 0 AND varLockBelongsToThis
 
     Sub-condition: varFlowSuccess = false AND varNumberAssigned = false AND varRequiresRecovery = false
         — Business rejection before any write: LOCK_BUSY, BLOCKED_RECOVERY_REQUIRED,
-          NEXT_NUMBER_IS_RESERVED, RESERVED_NOT_FOUND, COUNTER_OUT_OF_SYNC,
+          NEXT_NUMBER_IS_RESERVED, RESERVED_NOT_FOUND, RESERVED_STATUS_INVALID,
+          RESERVED_ALREADY_USED, COUNTER_OUT_OF_SYNC,
           COUNTER_AHEAD_NEEDS_REVIEW, LOCK_EXPIRED.
           Nothing was written; nothing to recover.
         Update NumberLocks (varLockItemId): Status = Released
@@ -992,6 +1029,8 @@ Respond to a PowerApp or Flow:
 | `LockExpiredDetected` | Warning | Step 1c | Expired lock ID, ExpiresAt, RelatedItemId |
 | `ReservedNumberUsed` | Info | Step 11 delete success | reservedNumber, reservedNumberItemId |
 | `ReservedNumberDeletionFailed` | Warning | Step 11 delete failure | reservedNumberItemId, error message |
+| `ReservedNumberAlreadyUsed` | Warning | Step 6 Branch B Condition C | reservedNumber, reservedItemId, UsedByItemId |
+| `ReservedStatusInvalid` | Warning | Step 6 Branch B Condition B | reservedNumber, reservedItemId, actual UsageStatus value |
 | `MetadataSyncFailed` | Warning | Step 9 failure | dokumentaItemId, error message |
 | `AppConfigUpdateFailed` | Warning | Step 10 failure | registryBookKey, varNextNumber, error message |
 
@@ -1082,10 +1121,18 @@ Internal column names — Dokumenta:
   DelovodniBrojText:
   DelovodniBrojGodina:
   DelovodnaKnjigaKey:
+Internal column names — Rezervisani brojevi (new V3 columns):
+  UsageStatus:
+  UsageStatus choice values (Pending / Used):
+  UsageStatus default value confirmed = Pending (yes/no):
+  UsedByItemId:
+  UsedAt:
+  DelovodnaKnjigaKey:
+  Godina:
 DelovodniBrojNumber unique constraint: confirmed NOT set (yes/no):
 DelovodniBrojText unique constraint: confirmed SET (yes/no):
 Confirmed tested in isolation (not via CreateDocumentTransaction): yes/no
-Test results for: NL-001, NL-002, NL-010, NL-011, NL-020, NL-030, NL-040, NL-045, NL-050, NL-060, NL-065, NL-070
+Test results for: NL-001, NL-002, NL-010, NL-011, NL-020, NL-030, NL-040, NL-045, NL-050, NL-060, NL-065, NL-070, NL-073
 ```
 
 ---
@@ -1138,7 +1185,7 @@ All tests must be run in isolation before wiring into `CF_DocCentral_CreateDocum
 
 | ID | Scenario | Setup | Expected output |
 |---|---|---|---|
-| NL-010 | Lock collision | Manually create Active lock with future ExpiresAt for same LockKey | `success=false`, `code=LOCK_BUSY`, `numberAssigned=false`, `blockNewRegistrations=false`, AuditLog `LockCollisionDetected` |
+| NL-010 | Lock collision | Manually create Active lock with future ExpiresAt for same LockKey | `success=false`, `code=LOCK_BUSY`, `numberAssigned=false`, `blockNewRegistrations=false`, **no AuditLog entry** (normal lock contention is not an anomaly) |
 | NL-011 | 10 concurrent runs, same book | Trigger 10 instances simultaneously | Exactly 10 unique sequential numbers; concurrent runs return `LOCK_BUSY`; caller retries until all succeed |
 | NL-012 | Concurrent runs, different books | 5 on DK01 and 5 on DK02 simultaneously | Each book gets 5 sequential unique numbers; no cross-book blocking |
 | NL-020 | Expired lock from previous run | Manually create Active lock with ExpiresAt in the past; different `FlowRunId` | `success=false`, `code=LOCK_EXPIRED`, `numberAssigned=false`, `blockNewRegistrations=true`, AuditLog `LockExpiredDetected` |
@@ -1158,6 +1205,7 @@ All tests must be run in isolation before wiring into `CF_DocCentral_CreateDocum
 |---|---|---|---|
 | NL-070 | Duplicate at flow level | Manually insert Svi predmeti item with same `DelovodniBrojNumber`, `DelovodnaKnjigaKey`, `DelovodniBrojGodina` | `success=false`, `code=DUPLICATE_DETECTED`, `numberAssigned=false`, `requiresRecovery=true`, `TechnicalStatus=FailedNeedsRecovery` set, AuditLog Critical |
 | NL-071 | Reserved not found | `useReservedNumber=true`, `reservedNumber=99`; no entry in list | `success=false`, `code=RESERVED_NOT_FOUND`, `numberAssigned=false`, no data written |
+| NL-073 | Reserved — UsageStatus blank/null | `useReservedNumber=true`; entry exists in Rezervisani brojevi but `UsageStatus` column is empty | `success=false`, `code=RESERVED_STATUS_INVALID`, `numberAssigned=false`, AuditLog `ReservedStatusInvalid` Warning, no data written |
 | NL-072 | SharePoint unique constraint fires at write | `DelovodniBrojText` unique constraint rejects the write | Step 8 failure handler: `code=ASSIGN_FAILED`, `TechnicalStatus=FailedNeedsRecovery` set |
 
 ### Output schema and control flow validation
