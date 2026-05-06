@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "canvas-authoring": {
+      "type": "stdio",
+      "command": "dnx",
+      "args": [
+        "Microsoft.PowerApps.CanvasAuthoring.McpServer",
+        "--yes",
+        "--prerelease",
+        "--source",
+        "https://api.nuget.org/v3/index.json"
+      ],
+      "env": {
+        "CANVAS_ENVIRONMENT_ID": "32b4305d-1d34-ec3a-8ed7-f5abd9985d45",
+        "CANVAS_APP_ID": "d17711d4-1417-4b8d-ac63-df49131264d0",
+        "CANVAS_CLUSTER_CATEGORY": "prod"
+      }
+    }
+  }
+}
